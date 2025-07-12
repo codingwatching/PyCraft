@@ -1,4 +1,4 @@
-import time
+from time import perf_counter_ns
 from typing import Any
 
 
@@ -14,22 +14,22 @@ class State:
         self.player: Any | None = None
         self.world: Any | None = None
 
-        self.last_frame_time: float = time.time()
-        self.fps = 0
-        self.delta = 0
+        self.last_frame_time: int = perf_counter_ns()
+        self.fps: float = 0.0
+        self.dt: float = 0.0
 
     def on_drawcall(self) -> None:
-        now = time.time()
-        self.delta = now - self.last_frame_time
+        now: int = perf_counter_ns()
+        self.dt = (now - self.last_frame_time) / 1_000_000_000
         self.last_frame_time = now
 
-        self.fps = 1 / self.delta
+        self.fps = 1 / self.dt
 
         self.frame += 1
         print(f"\r{self.fps} FPS", end="\t\t")
 
-        if self.delta < 1 / 128:
-            time.sleep(1 / 128 - self.delta)
+        if self.fps < 59:
+            print(f"LOW!")
 
     def on_close(self) -> None:
         self.alive = False

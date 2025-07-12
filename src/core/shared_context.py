@@ -1,5 +1,4 @@
 import threading
-import time
 from typing import Any
 from .state import State
 
@@ -42,7 +41,6 @@ class SharedContext:
 
         while self.state.alive:
             self.step()
-            time.sleep(1 / 60)
         
         if self.state.world:
             self.state.world.on_close()

@@ -27,7 +27,7 @@ class Player:
         }
 
     def drawcall(self):
-        sens = self.state_map["speed"]
+        sens = self.state_map["speed"] * self.state.dt * 42
         rotY = math.radians(-self.state_map["rotation"][1])
         dx, dz = math.sin(rotY), math.cos(rotY)
 
@@ -65,8 +65,8 @@ class Player:
             dx = current_position[0] - self.state_map["mouse_delta"][0]
             dy = current_position[1] - self.state_map["mouse_delta"][1]
             dy = -dy
-            self.state_map["rotation"][0] += dy / 8
-            self.state_map["rotation"][1] -= dx / 8
+            self.state_map["rotation"][0] += dy / 8 * self.state.dt * 42
+            self.state_map["rotation"][1] -= dx / 8 * self.state.dt * 42
             if self.state_map["rotation"][0] > 90:
                 self.state_map["rotation"][0] = 90
             elif self.state_map["rotation"][0] < -90:

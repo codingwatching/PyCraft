@@ -1,4 +1,3 @@
-from time import sleep
 import multiprocessing
 
 import numpy as np
@@ -157,7 +156,6 @@ class ChunkHandler:
         while self.namespace.alive:
             storage.update(namespace.camera_chunk)
 
-            sleep(0.1)
             if not storage.changed:
                 continue
 
