@@ -9,7 +9,7 @@ from core.state import State
 from .chunk import CHUNK_SIDE, MESH_GENERATED, TERRAIN_GENERATED, Chunk
 
 RENDER_DIST = 6
-BATCH_SIZE = 42
+BATCH_SIZE = 128
 
 
 class ChunkStorage:

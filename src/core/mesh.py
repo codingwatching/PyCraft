@@ -57,6 +57,7 @@ class Mesh:
     ) -> None:
         self.buffers: BufferList = []
         self.state: State = state
+        self.last_data_hash = None
 
     def get_latest_buffer(self) -> BufferSet | None:
         latest = None
@@ -68,9 +69,17 @@ class Mesh:
         return latest
 
     def set_data(self, vertices: BufferData, uvs: BufferData) -> None:
+        vertices.flags.writeable = False
+        uvs.flags.writeable = False
+        data_hash = hash(str(vertices) + str(uvs))
+
+        if self.last_data_hash == data_hash:
+            return
+
         vertex_buf = DisposableBuffer(vertices, VERTEX)
         uv_buf = DisposableBuffer(uvs, UV)
         self.buffers.insert(0, (vertex_buf, uv_buf))
+        self.last_data_hash = data_hash
 
     def render(self) -> None:
         buffers = self.get_latest_buffer()
