@@ -79,7 +79,6 @@ class Chunk:
     def generate_terrain(self) -> None:
         terrain = np.ones((CHUNK_SIDE, CHUNK_SIDE, CHUNK_SIDE), dtype=np.uint8)
 
-        # cave noise
         for x in range(CHUNK_SIDE):
             i = self.position[0] * CHUNK_SIDE + x
             for z in range(CHUNK_SIDE):
