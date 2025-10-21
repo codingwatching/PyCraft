@@ -21,7 +21,7 @@ class Player:
             "velocity": [0, 0, 0],
             "friction": 0.9,
             "gravity": 9.81,
-            "speed": 0.1,
+            "speed": 0.064,
             "zoom": False,
             "fly": False,
         }

@@ -9,7 +9,7 @@ from core.state import State
 from .chunk import CHUNK_SIDE, MESH_GENERATED, TERRAIN_GENERATED, Chunk
 
 RENDER_DIST = 6
-BATCH_SIZE = 16
+BATCH_SIZE = 42
 
 
 class ChunkStorage:
@@ -131,13 +131,25 @@ class ChunkStorage:
         for required in required_chunks:
             self.ensure_chunk(required)
 
+        # todo varname "chunk" is kinda misleading, it stores a position!
+        # from here...
         to_delete = []
-        for chunk in list(self.chunks.keys()):
+        for chunk in self.chunks:
             if chunk not in required_chunks:
                 to_delete.append(chunk)
 
         for chunk in to_delete:
             self.cache_chunk(chunk)
+
+        to_delete = []
+        for chunk in self.cache:
+            distance = dist(chunk, camera_chunk)
+            if distance > RENDER_DIST * 3:
+                to_delete.append(chunk)
+
+        for chunk in to_delete:
+            del self.cache[chunk]
+        # ...to here.
 
         count = 0
         while len(self.build_queue) > 0 and count < BATCH_SIZE:
@@ -146,12 +158,10 @@ class ChunkStorage:
             self.build_chunk(position)
             count += 1
 
-        count = 0
-        while len(self.rebuild_queue) > 0 and count < BATCH_SIZE:
+        while len(self.rebuild_queue) > 0:
             self.rebuild_queue = self.sort_by_distance(self.rebuild_queue)
             position = self.rebuild_queue.pop(0)
             self.rebuild_chunk(position)
-            count += 1
 
 class ChunkHandler:
     def __init__(self):

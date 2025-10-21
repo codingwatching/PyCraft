@@ -37,7 +37,7 @@ from .mesh import DELETE_UNNEEDED, MeshHandler
 from .shared_context import SharedContext
 from .state import State
 
-BACKGROUND = (0.15, 0.15, 0.15)
+BACKGROUND = (0.5, 0.69, 1.0)
 
 class Renderer:
     def __init__(self, state: State) -> None:
