@@ -58,9 +58,9 @@ class Renderer:
         model = glm.mat4(1.0)
         view, projection = self.camera.get_matrix()
         camera = (
-            -self.camera.position[0],
-            -self.camera.position[1],
-            -self.camera.position[2],
+            self.camera.position[0],
+            self.camera.position[1],
+            self.camera.position[2],
         )
         fog_start = 0.1
         fog_end = CHUNK_SIDE * (RENDER_DIST - 1.25)
@@ -110,3 +110,4 @@ class Renderer:
 
         self.mesh_handler.drawcall()
         self.mesh_handler.update(DELETE_UNNEEDED)
+

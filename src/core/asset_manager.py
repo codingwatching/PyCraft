@@ -105,3 +105,4 @@ class AssetManager:
         if self.texture is None:
             return
         glBindTexture(GL_TEXTURE_2D, self.texture)
+

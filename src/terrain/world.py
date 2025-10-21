@@ -1,3 +1,4 @@
+from math import dist
 import multiprocessing
 
 import numpy as np
@@ -7,7 +8,8 @@ from core.state import State
 
 from .chunk import CHUNK_SIDE, MESH_GENERATED, TERRAIN_GENERATED, Chunk
 
-RENDER_DIST = 4
+RENDER_DIST = 6
+BATCH_SIZE = 16
 
 
 class ChunkStorage:
@@ -15,6 +17,8 @@ class ChunkStorage:
         self.chunks = {}
         self.cache = {}
         self.rebuild_queue = []
+        self.build_queue = []
+        self.camera_chunk = None
         self.changed = False
 
     def ensure_chunk(self, position):
@@ -23,13 +27,12 @@ class ChunkStorage:
         if position in self.cache:
             self.uncache_chunk(position)
             return
+
         chunk = Chunk(position)
         self.chunks[position] = chunk
-        self.changed = True
+        self.build_queue.append(position)
 
     def cache_chunk(self, position):
-        # TODO: Delete the cached chunk if its
-        # TODO: too far away, i.e. distance threshold
         self.cache[position] = self.chunks[position]
         del self.chunks[position]
 
@@ -64,17 +67,34 @@ class ChunkStorage:
         for chunk in neighbours:
             self.rebuild_queue.append(chunk.position)
 
-    def generate(self):
-        for id in self.chunks:
-            if self.chunks[id].state < TERRAIN_GENERATED:
-                self.chunks[id].generate_terrain()
+    def sort_by_distance(self, positions):
+        return sorted(positions, key=lambda x: dist(x, self.camera_chunk))
 
-        for id in self.chunks:
-            if self.chunks[id].state != TERRAIN_GENERATED:
-                continue
-            self.chunks[id].generate_mesh(self)
+    def build_chunk(self, position):
+        if not position in self.chunks:
+            self.ensure_chunk(position)
 
-        self.changed = False
+        self.chunks[position].generate_terrain()
+        self.chunks[position].generate_mesh(self)
+
+        self.notify_neighbours(position)
+        self.changed = True
+
+    def rebuild_chunk(self, position) -> None:
+        if not position in self.chunks:
+            self.ensure_chunk(position)
+        chunk = None
+
+        if position in self.chunks:
+            chunk = self.chunks[position]
+        elif position in self.cache:
+            chunk = self.cache[position]
+
+        if chunk is None:
+            return
+
+        chunk.generate_mesh(self)
+        self.changed = True
 
     def generate_mesh_data(self):
         vertices = []
@@ -96,33 +116,20 @@ class ChunkStorage:
         except ValueError:
             return None
 
-    def rebuild_chunk_mesh(self, position) -> None:
-        chunk = None
-
-        if position in self.chunks:
-            chunk = self.chunks[position]
-        elif position in self.cache:
-            chunk = self.cache[position]
-
-        if chunk is None:
-            return
-        chunk.rebuild_mesh(self)
-        self.changed = True
-
     def update(self, camera_chunk):
+        self.camera_chunk = camera_chunk
+
         required_chunks = []
         for x in range(-RENDER_DIST - 1, RENDER_DIST):
             for y in range(-RENDER_DIST - 1, RENDER_DIST):
                 for z in range(-RENDER_DIST - 1, RENDER_DIST):
-                    translated_x = x - camera_chunk[0]
-                    translated_y = y - camera_chunk[1]
-                    translated_z = z - camera_chunk[2]
+                    translated_x = x + camera_chunk[0]
+                    translated_y = y + camera_chunk[1]
+                    translated_z = z + camera_chunk[2]
                     required_chunks.append((translated_x, translated_y, translated_z))
 
         for required in required_chunks:
-            if required not in list(self.chunks.keys()):
-                self.ensure_chunk(required)
-                continue
+            self.ensure_chunk(required)
 
         to_delete = []
         for chunk in list(self.chunks.keys()):
@@ -132,9 +139,19 @@ class ChunkStorage:
         for chunk in to_delete:
             self.cache_chunk(chunk)
 
-        if len(self.rebuild_queue) > 0:
+        count = 0
+        while len(self.build_queue) > 0 and count < BATCH_SIZE:
+            self.build_queue = self.sort_by_distance(self.build_queue)
+            position = self.build_queue.pop(0)
+            self.build_chunk(position)
+            count += 1
+
+        count = 0
+        while len(self.rebuild_queue) > 0 and count < BATCH_SIZE:
+            self.rebuild_queue = self.sort_by_distance(self.rebuild_queue)
             position = self.rebuild_queue.pop(0)
-            self.rebuild_chunk_mesh(position)
+            self.rebuild_chunk(position)
+            count += 1
 
 class ChunkHandler:
     def __init__(self):
@@ -159,7 +176,6 @@ class ChunkHandler:
             if not storage.changed:
                 continue
 
-            storage.generate()
             namespace.mesh_data = storage.generate_mesh_data()
             namespace.changed = True
 
@@ -205,3 +221,4 @@ class World:
 
     def on_close(self) -> None:
         self.handler.kill()
+

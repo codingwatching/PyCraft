@@ -27,7 +27,7 @@ class Player:
         }
 
     def drawcall(self):
-        sens = self.state_map["speed"] * self.state.dt * 42
+        sens = -self.state_map["speed"] * self.state.dt * 42
         rotY = math.radians(-self.state_map["rotation"][1])
         dx, dz = math.sin(rotY), math.cos(rotY)
 
@@ -74,10 +74,10 @@ class Player:
             self.state_map["mouse_delta"] = current_position
 
         if glfw.get_key(self.state.window.window, glfw.KEY_SPACE) == glfw.PRESS:
-            self.state_map["velocity"][1] -= 0.05
+            self.state_map["velocity"][1] -= sens
 
         if glfw.get_key(self.state.window.window, glfw.KEY_LEFT_SHIFT) == glfw.PRESS:
-            self.state_map["velocity"][1] += 0.05
+            self.state_map["velocity"][1] += sens
 
         self.state_map["position"][0] += self.state_map["velocity"][0]
         self.state_map["position"][1] += self.state_map["velocity"][1]
@@ -90,3 +90,4 @@ class Player:
         rot = [self.state_map["rotation"][i] * -1 for i in range(3)]
         self.state.camera.position = self.state_map["position"]
         self.state.camera.rotation = rot
+

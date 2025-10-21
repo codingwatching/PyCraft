@@ -26,10 +26,7 @@ class State:
         self.fps = 1 / self.dt
 
         self.frame += 1
-        print(f"\r{self.fps} FPS", end="\t\t")
-
-        if self.fps < 59:
-            print(f"LOW!")
 
     def on_close(self) -> None:
         self.alive = False
+

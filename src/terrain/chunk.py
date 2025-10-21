@@ -150,3 +150,4 @@ class Chunk:
             self.uvs = np.array([], dtype=np.float32)
 
         self.state = MESH_GENERATED
+

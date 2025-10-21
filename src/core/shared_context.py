@@ -59,3 +59,4 @@ class SharedContext:
 
         glfw.swap_buffers(self.window)
         glfw.poll_events()
+

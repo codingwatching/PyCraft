@@ -37,6 +37,7 @@ class Window:
             width, height = self.size
             glViewport(0, 0, width, height)
 
+            self.state.player.drawcall()
             self.mainloop_step()
 
             glfw.swap_buffers(self.window)
@@ -54,3 +55,4 @@ class Window:
     @property
     def size(self) -> tuple[int, int]:
         return glfw.get_window_size(self.window)
+
