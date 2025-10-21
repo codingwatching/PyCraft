@@ -1,5 +1,5 @@
 import glfw
-from OpenGL.GL import GL_TRUE, glViewport
+from OpenGL.GL import GL_TRUE, glEnable, GL_MULTISAMPLE, glViewport
 
 from terrain.world import World
 
@@ -14,10 +14,13 @@ class Window:
                 "[core.window.Window] Init failed: Could not initialize glfw"
             )
 
+        glfw.window_hint(glfw.SAMPLES, 1)
         glfw.window_hint(glfw.CONTEXT_VERSION_MAJOR, 3)
         glfw.window_hint(glfw.CONTEXT_VERSION_MINOR, 3)
         glfw.window_hint(glfw.OPENGL_FORWARD_COMPAT, GL_TRUE)
         glfw.window_hint(glfw.OPENGL_PROFILE, glfw.OPENGL_CORE_PROFILE)
+
+        glEnable(GL_MULTISAMPLE)
 
         self.window = glfw.create_window(640, 480, "Voxl", None, None)
         if not self.window:

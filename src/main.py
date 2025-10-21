@@ -8,3 +8,4 @@ if __name__ == "__main__":
     asset_manager.load_assets()
     player = Player(window.state)
     window.start_mainloop()
+

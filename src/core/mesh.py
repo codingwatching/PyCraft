@@ -132,7 +132,7 @@ class MeshHandler:
 
         if self.state.mesh_handler is not None:
             raise Exception(
-                "[core.dynamic_vbo.DynamicVBOHandler] Tried to create multiple instances of this class"
+                "[core.mesh.MeshHandler] Tried to create multiple instances of this class"
             )
         self.state.mesh_handler = self
 
