@@ -35,13 +35,14 @@ class Window:
         self.renderer: Renderer = Renderer(self.state)
         self.world: World = World(self.state)
 
-    def start_mainloop(self) -> None:
+    def mainloop(self) -> None:
         while not glfw.window_should_close(self.window):
             width, height = self.size
             glViewport(0, 0, width, height)
 
             self.state.player.drawcall()
-            self.mainloop_step()
+            self.renderer.drawcall()
+            self.state.on_drawcall()
 
             glfw.swap_buffers(self.window)
             glfw.poll_events()
@@ -50,10 +51,6 @@ class Window:
         while self.state.shared_context_alive:
             pass
         glfw.terminate()
-
-    def mainloop_step(self) -> None:
-        self.renderer.drawcall()
-        self.state.on_drawcall()
 
     @property
     def size(self) -> tuple[int, int]:

@@ -7,5 +7,5 @@ if __name__ == "__main__":
     asset_manager: AssetManager = AssetManager(window.state)
     asset_manager.load_assets()
     player = Player(window.state)
-    window.start_mainloop()
+    window.mainloop()
 
