@@ -23,8 +23,6 @@ from .state import State
 
 BufferData: TypeAlias = np.typing.NDArray[np.float32]
 
-DELETE_UNNEEDED = 0
-SEND_TO_GPU = 1
 VERTEX = 2
 UV = 3
 
@@ -101,18 +99,12 @@ class Mesh:
         glDisableVertexAttribArray(1)
         glBindBuffer(GL_ARRAY_BUFFER, 0)
 
-    def update_buffers(self, mode: int = SEND_TO_GPU) -> None:
+    def update_buffers(self) -> None:
         for vertex, uv in self.buffers:
-            if not mode == SEND_TO_GPU:
-                continue
-
             if not vertex.ready:
                 vertex.send_to_gpu()
             if not uv.ready:
                 uv.send_to_gpu()
-
-        if mode != DELETE_UNNEEDED:
-            return
 
         to_delete = []
         latest = self.get_latest_buffer()
@@ -163,10 +155,10 @@ class MeshHandler:
         except RuntimeError:
             pass
 
-    def update(self, mode: int = SEND_TO_GPU) -> None:
+    def update(self) -> None:
         try:
             for mesh in self.meshes:
-                self.meshes[mesh].update_buffers(mode)
+                self.meshes[mesh].update_buffers()
         except RuntimeError:
             pass
         except IndexError:

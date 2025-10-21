@@ -8,8 +8,8 @@ from core.state import State
 
 from .chunk import CHUNK_SIDE, MESH_GENERATED, TERRAIN_GENERATED, Chunk
 
-RENDER_DIST = 8
-BATCH_SIZE = min([RENDER_DIST ** 2, 50])
+RENDER_DIST = 7
+BATCH_SIZE = min([RENDER_DIST ** 2, 42])
 
 
 class ChunkStorage:

@@ -33,7 +33,7 @@ from terrain.world import RENDER_DIST
 
 from .asset_manager import AssetManager
 from .camera import Camera
-from .mesh import DELETE_UNNEEDED, MeshHandler
+from .mesh import MeshHandler
 from .shared_context import SharedContext
 from .state import State
 
@@ -109,5 +109,5 @@ class Renderer:
         self.set_uniforms()
 
         self.mesh_handler.drawcall()
-        self.mesh_handler.update(DELETE_UNNEEDED)
+        self.mesh_handler.update()
 

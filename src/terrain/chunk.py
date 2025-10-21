@@ -1,4 +1,5 @@
-import noise
+from noise import snoise2, snoise3
+from time import time
 import numpy as np
 from typing import TypeAlias
 
@@ -76,37 +77,19 @@ class Chunk:
                 self.terrain[dest_slice] = neighbor.terrain[source]
 
     def generate_terrain(self) -> None:
-        for i in range(CHUNK_SIDE):
-            for j in range(CHUNK_SIDE):
-                x, z = i + 1, j + 1
-                relative_y = self.position[1] * (CHUNK_SIDE - 1)
-                translated = (
-                    (x + self.position[0] * (CHUNK_SIDE - 1)) / 1000,
-                    (z + self.position[2] * (CHUNK_SIDE - 1)) / 1000,
-                )
-                terrain_height: float = noise.snoise2(*translated) * 100
-                terrain_height += (
-                    noise.snoise2(*(translated[i] * 10 for i in [0, 1])) * 10
-                )
-                terrain_height: int = int(terrain_height - relative_y)
+        terrain = np.ones((CHUNK_SIDE, CHUNK_SIDE, CHUNK_SIDE), dtype=np.uint8)
 
-                if terrain_height >= 0 and terrain_height <= CHUNK_SIDE:
-                    for k in range(terrain_height):
-                        self.terrain[x, k, z] = 1
-                elif terrain_height > CHUNK_SIDE:
-                    self.terrain[x, :, z] = 1
+        # cave noise
+        for x in range(CHUNK_SIDE):
+            i = self.position[0] * CHUNK_SIDE + x
+            for z in range(CHUNK_SIDE):
+                k = self.position[2] * CHUNK_SIDE + z
+                for y in range(CHUNK_SIDE):
+                    j = self.position[1] * CHUNK_SIDE + y
+                    height = snoise2(i / 100, k / 100) * 10
+                    terrain[x, y, z] = j < height
 
-                for l in range(CHUNK_SIDE):
-                    y = l + 1
-                    translated = (
-                        (x + self.position[0] * (CHUNK_SIDE - 1)) / 100,
-                        (y + self.position[1] * (CHUNK_SIDE - 1)) / 100,
-                        (z + self.position[2] * (CHUNK_SIDE - 1)) / 100,
-                    )
-                    cave_noise: float = noise.snoise3(*translated)
-                    if cave_noise > 0.3:
-                        self.terrain[x, y, z] = 0
-
+        self.terrain[1:-1, 1:-1, 1:-1] = terrain
         self.state = TERRAIN_GENERATED
 
     def generate_mesh(self, world) -> None:
