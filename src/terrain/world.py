@@ -155,12 +155,10 @@ class ChunkStorage:
             self.build_chunk(position)
             count += 1
 
-        count = 0
-        while len(self.rebuild_queue) > 0 and count < BATCH_SIZE:
+        while len(self.rebuild_queue) > 0:
             self.rebuild_queue = self.sort_by_distance(self.rebuild_queue)
             position = self.rebuild_queue.pop(0)
             self.rebuild_chunk(position)
-            count += 1
 
 class ChunkHandler:
     def __init__(self):
