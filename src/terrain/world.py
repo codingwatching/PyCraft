@@ -8,8 +8,8 @@ from core.state import State
 
 from .chunk import CHUNK_SIDE, MESH_GENERATED, TERRAIN_GENERATED, Chunk
 
-RENDER_DIST = 6
-BATCH_SIZE = 128
+RENDER_DIST = 8
+BATCH_SIZE = min([RENDER_DIST ** 2, 50])
 
 
 class ChunkStorage:
@@ -117,27 +117,24 @@ class ChunkStorage:
             return None
 
     def update(self, camera_chunk):
+        self.changed = False
         self.camera_chunk = camera_chunk
 
-        required_chunks = []
+        required_chunks = set()
         for x in range(-RENDER_DIST - 1, RENDER_DIST):
             for y in range(-RENDER_DIST - 1, RENDER_DIST):
                 for z in range(-RENDER_DIST - 1, RENDER_DIST):
                     translated_x = x + camera_chunk[0]
                     translated_y = y + camera_chunk[1]
                     translated_z = z + camera_chunk[2]
-                    required_chunks.append((translated_x, translated_y, translated_z))
+                    required_chunks.add((translated_x, translated_y, translated_z))
 
         for required in required_chunks:
             self.ensure_chunk(required)
 
         # todo varname "chunk" is kinda misleading, it stores a position!
         # from here...
-        to_delete = []
-        for chunk in self.chunks:
-            if chunk not in required_chunks:
-                to_delete.append(chunk)
-
+        to_delete = set(self.chunks.keys()) - required_chunks
         for chunk in to_delete:
             self.cache_chunk(chunk)
 
@@ -158,10 +155,12 @@ class ChunkStorage:
             self.build_chunk(position)
             count += 1
 
-        while len(self.rebuild_queue) > 0:
+        count = 0
+        while len(self.rebuild_queue) > 0 and count < BATCH_SIZE:
             self.rebuild_queue = self.sort_by_distance(self.rebuild_queue)
             position = self.rebuild_queue.pop(0)
             self.rebuild_chunk(position)
+            count += 1
 
 class ChunkHandler:
     def __init__(self):
