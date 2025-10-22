@@ -29,7 +29,7 @@ class Window:
                 "[core.window.Window] Init failed: Could not create glfw window"
             )
         glfw.make_context_current(self.window)
-        glfw.swap_interval(1) # vsync
+        glfw.swap_interval(0) # vsync
 
         self.state: State = State(self)
         self.renderer: Renderer = Renderer(self.state)
