@@ -98,6 +98,7 @@ class ChunkStorage:
 
     def generate_mesh_data(self):
         position = []
+        orientation = []
         tex_id = []
 
         for id in list(self.chunks.keys()):
@@ -108,12 +109,14 @@ class ChunkStorage:
 
             data = chunk.meshdata
             position.extend(data.position)
+            orientation.extend(data.orientation)
             tex_id.extend(data.tex_id)
 
         try:
             position = np.array(position, dtype=np.float32)
+            orientation = np.array(orientation, dtype=np.float32)
             tex_id = np.array(tex_id, dtype=np.float32)
-            return (position, tex_id)
+            return (position, orientation, tex_id)
         except ValueError:
             return None
 

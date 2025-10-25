@@ -13,11 +13,19 @@ NOT_GENERATED = 0
 TERRAIN_GENERATED = 1
 MESH_GENERATED = 2
 
+FRONT  = 0
+BACK   = 1
+LEFT   = 2
+RIGHT  = 3
+TOP    = 4
+BOTTOM = 5
+
 PositionType: TypeAlias = tuple[int, int, int]
 
 class ChunkMeshData:
     def __init__(self):
         self.position = []
+        self.orientation = []
         self.tex_id = []
 
 class Chunk:
@@ -107,6 +115,7 @@ class Chunk:
                         ])
 
         self.meshdata.position = position
+        self.meshdata.orientation = np.ones(len(tex_id), dtype=np.uint32) * TOP
         self.meshdata.tex_id = tex_id
 
         self.state = MESH_GENERATED

@@ -5,6 +5,7 @@ import numpy as np
 from OpenGL.GL import (
     GL_ARRAY_BUFFER,
     GL_FLOAT,
+    GL_UNSIGNED_INT,
     GL_STATIC_DRAW,
     GL_TRIANGLES,
     glBindBuffer,
@@ -25,7 +26,8 @@ from .state import State
 BufferData: TypeAlias = np.typing.NDArray[np.float32]
 instance_dtype = np.dtype([
     ("position", np.float32, 3),
-    ("tex_id", np.float32)
+    ("orientation", np.uint32),
+    ("tex_id", np.float32),
 ])
 
 
@@ -66,15 +68,16 @@ class Mesh:
             break
         return latest
 
-    def set_data(self, position: BufferData, tex_id: BufferData) -> None:
-        if len(position) != len(tex_id):
-            raise RuntimeError("position and tex_id buffer lengths don't match 3:1")
+    def set_data(self, position: BufferData, orientation: BufferData, tex_id: BufferData) -> None:
+        if not (len(position) == len(tex_id) == len(orientation)):
+            raise RuntimeError("buffer lengths don't match")
 
         if len(position) == 0:
             return
 
         data = np.zeros(len(position), dtype=instance_dtype)
         data['position'][:] = position
+        data['orientation'][:] = orientation
         data['tex_id'][:] = tex_id
 
         buffer = DisposableBuffer(data)
@@ -89,6 +92,7 @@ class Mesh:
 
         stride = buffer.data.strides[0]
         offset_pos = buffer.data.dtype.fields['position'][1]
+        offset_ori = buffer.data.dtype.fields['orientation'][1]
         offset_tex = buffer.data.dtype.fields['tex_id'][1]
 
         glEnableVertexAttribArray(0)
@@ -96,12 +100,19 @@ class Mesh:
         glVertexAttribDivisor(0, 1)
 
         glEnableVertexAttribArray(1)
-        glVertexAttribPointer(1, 1, GL_FLOAT, False, stride, ctypes.c_void_p(offset_tex))
+        glVertexAttribPointer(1, 1, GL_UNSIGNED_INT, False, stride, ctypes.c_void_p(offset_ori))
         glVertexAttribDivisor(1, 1)
 
-        glDrawArraysInstanced(GL_TRIANGLES, 0, 36, len(buffer.data))
+        glEnableVertexAttribArray(2)
+        glVertexAttribPointer(2, 1, GL_FLOAT, False, stride, ctypes.c_void_p(offset_tex))
+        glVertexAttribDivisor(2, 1)
+
+        glDrawArraysInstanced(GL_TRIANGLES, 0, 6, len(buffer.data))
 
         glDisableVertexAttribArray(0)
+        glDisableVertexAttribArray(1)
+        glDisableVertexAttribArray(2)
+
         glBindBuffer(GL_ARRAY_BUFFER, 0)
 
     def update_buffers(self) -> None:

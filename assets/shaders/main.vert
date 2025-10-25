@@ -1,7 +1,8 @@
-# version 330 core
+#version 330 core
 
 layout(location = 0) in vec3 position;
-layout(location = 1) in float tex_id;
+layout(location = 1) in float orientation;  // 0=front, 1=back, 2=left, 3=right, 4=top, 5=bottom
+layout(location = 2) in float tex_id;
 
 out vec3 v_pos;
 flat out float v_tex_index;
@@ -9,61 +10,59 @@ out vec2 v_uv;
 
 uniform mat4 view;
 uniform mat4 projection;
-uniform mat4 camera;
 
 vec3 cubeVertex(int idx) {
     vec3 verts[36] = vec3[](
-        // Back face (-Z)
-        vec3(-0.5,-0.5,-0.5), vec3(0.5, 0.5,-0.5), vec3(0.5,-0.5,-0.5),
-        vec3(0.5, 0.5,-0.5), vec3(-0.5,-0.5,-0.5), vec3(-0.5, 0.5,-0.5),
-
-        // Front face (+Z)
+        // FRONT (+Z)
         vec3(-0.5,-0.5,0.5), vec3(0.5,-0.5,0.5), vec3(0.5, 0.5,0.5),
         vec3(0.5, 0.5,0.5), vec3(-0.5, 0.5,0.5), vec3(-0.5,-0.5,0.5),
 
-        // Top face (+Y)
-        vec3(-0.5,0.5,-0.5), vec3(-0.5,0.5, 0.5), vec3(0.5,0.5, 0.5),
-        vec3(0.5,0.5, 0.5), vec3(0.5,0.5,-0.5), vec3(-0.5,0.5,-0.5),
+        // BACK (-Z)
+        vec3(0.5,-0.5,-0.5), vec3(-0.5,-0.5,-0.5), vec3(-0.5, 0.5,-0.5),
+        vec3(-0.5, 0.5,-0.5), vec3(0.5, 0.5,-0.5), vec3(0.5,-0.5,-0.5),
 
-        // Bottom face (-Y)
-        vec3(-0.5,-0.5,-0.5), vec3(0.5,-0.5,-0.5), vec3(0.5,-0.5, 0.5),
-        vec3(0.5,-0.5, 0.5), vec3(-0.5,-0.5, 0.5), vec3(-0.5,-0.5,-0.5),
-
-        // Left face (-X)
+        // LEFT (-X)
         vec3(-0.5,-0.5,-0.5), vec3(-0.5,-0.5, 0.5), vec3(-0.5, 0.5, 0.5),
         vec3(-0.5, 0.5, 0.5), vec3(-0.5, 0.5,-0.5), vec3(-0.5,-0.5,-0.5),
 
-        // Right face (+X)
-        vec3(0.5,-0.5,-0.5), vec3(0.5, 0.5,-0.5), vec3(0.5, 0.5, 0.5),
-        vec3(0.5, 0.5, 0.5), vec3(0.5,-0.5, 0.5), vec3(0.5,-0.5,-0.5)
+        // RIGHT (+X)
+        vec3(0.5,-0.5, 0.5), vec3(0.5,-0.5,-0.5), vec3(0.5, 0.5,-0.5),
+        vec3(0.5, 0.5,-0.5), vec3(0.5, 0.5, 0.5), vec3(0.5,-0.5, 0.5),
+
+        // TOP (+Y)
+        vec3(-0.5,0.5, 0.5), vec3(0.5,0.5, 0.5), vec3(0.5,0.5,-0.5),
+        vec3(0.5,0.5,-0.5), vec3(-0.5,0.5,-0.5), vec3(-0.5,0.5, 0.5),
+
+        // BOTTOM (-Y)
+        vec3(-0.5,-0.5,-0.5), vec3(0.5,-0.5,-0.5), vec3(0.5,-0.5, 0.5),
+        vec3(0.5,-0.5, 0.5), vec3(-0.5,-0.5, 0.5), vec3(-0.5,-0.5,-0.5)
     );
     return verts[idx];
 }
 
-// precomputed UVs for each vertex
 vec2 cubeUV(int idx) {
     vec2 uvs[36] = vec2[](
-        // Back face
+        // FRONT (+Z)
         vec2(0,0), vec2(1,0), vec2(1,1),
         vec2(1,1), vec2(0,1), vec2(0,0),
 
-        // Front face
+        // BACK (-Z)
         vec2(0,0), vec2(1,0), vec2(1,1),
         vec2(1,1), vec2(0,1), vec2(0,0),
 
-        // Top face
+        // LEFT (-X)
         vec2(0,0), vec2(1,0), vec2(1,1),
         vec2(1,1), vec2(0,1), vec2(0,0),
 
-        // Bottom face
+        // RIGHT (+X)
         vec2(0,0), vec2(1,0), vec2(1,1),
         vec2(1,1), vec2(0,1), vec2(0,0),
 
-        // Left face
+        // TOP (+Y)
         vec2(0,0), vec2(1,0), vec2(1,1),
         vec2(1,1), vec2(0,1), vec2(0,0),
 
-        // Right face
+        // BOTTOM (-Y)
         vec2(0,0), vec2(1,0), vec2(1,1),
         vec2(1,1), vec2(0,1), vec2(0,0)
     );
@@ -71,11 +70,17 @@ vec2 cubeUV(int idx) {
 }
 
 void main() {
-    int vert_id = gl_VertexID % 36;
-    vec3 local_pos = cubeVertex(vert_id);
+    int face = int(orientation);   // which face (0–5)
+    int vert_id = gl_VertexID % 6; // vertex within face
+    int idx = face * 6 + vert_id;  // final vertex index
+
+    vec3 local_pos = cubeVertex(idx);
     vec3 world_pos = position + local_pos;
-    gl_Position = projection * view * vec4(world_pos,1.0);
+
+    gl_Position = projection * view * vec4(world_pos, 1.0);
+
     v_pos = local_pos;
     v_tex_index = tex_id;
-    v_uv = cubeUV(vert_id);
+    v_uv = cubeUV(idx);
 }
+
