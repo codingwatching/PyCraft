@@ -143,7 +143,7 @@ class ChunkStorage:
         to_delete = []
         for position in self.cache:
             distance = dist(position, camera_chunk)
-            if distance > RENDER_DIST * 3:
+            if distance > RENDER_DIST * 4:
                 to_delete.append(position)
 
         for position in to_delete:

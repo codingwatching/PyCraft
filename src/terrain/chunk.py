@@ -20,6 +20,15 @@ RIGHT  = 3
 TOP    = 4
 BOTTOM = 5
 
+FACES = [
+    (FRONT,  (0,  0,  1)),
+    (BACK,   (0,  0, -1)),
+    (LEFT,  (-1,  0,  0)),
+    (RIGHT,  (1,  0,  0)),
+    (TOP,    (0,  1,  0)),
+    (BOTTOM, (0, -1,  0)),
+]
+
 PositionType: TypeAlias = tuple[int, int, int]
 
 class ChunkMeshData:
@@ -101,22 +110,28 @@ class Chunk:
         self.update_neighbour_terrain(world)
 
         position = []
+        orientation = []
         tex_id = []
-        for x in range(CHUNK_SIDE):
-            for y in range(CHUNK_SIDE):
-                for z in range(CHUNK_SIDE):
-                    i, j, k = x+1, y+1, z+1
-                    if self.terrain[i][j][k]:
-                        tex_id.append(randint(0,2))
-                        position.append([
-                            self.position[0] * CHUNK_SIDE + x - CHUNK_SIDE // 2,
-                            self.position[1] * CHUNK_SIDE + y - CHUNK_SIDE // 2,
-                            self.position[2] * CHUNK_SIDE + z - CHUNK_SIDE // 2,
-                        ])
 
-        self.meshdata.position = position
-        self.meshdata.orientation = np.ones(len(tex_id), dtype=np.uint32) * TOP
-        self.meshdata.tex_id = tex_id
+        for x in range(1, CHUNK_SIDE + 1):
+            for y in range(1, CHUNK_SIDE + 1):
+                for z in range(1, CHUNK_SIDE + 1):
+                    if not self.terrain[x, y, z]:
+                        continue
+
+                    wx = self.position[0] * CHUNK_SIDE + (x - 1) - CHUNK_SIDE // 2
+                    wy = self.position[1] * CHUNK_SIDE + (y - 1) - CHUNK_SIDE // 2
+                    wz = self.position[2] * CHUNK_SIDE + (z - 1) - CHUNK_SIDE // 2
+
+                    for face, (dx, dy, dz) in FACES:
+                        if self.is_air(x + dx, y + dy, z + dz):
+                            position.append((wx, wy, wz))
+                            orientation.append(face)
+                            tex_id.append(randint(0, 3))
+
+        self.meshdata.position = np.array(position, dtype=np.float32)
+        self.meshdata.orientation = np.array(orientation, dtype=np.uint32)
+        self.meshdata.tex_id = np.array(tex_id, dtype=np.uint32)
 
         self.state = MESH_GENERATED
 
