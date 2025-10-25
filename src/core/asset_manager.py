@@ -6,6 +6,7 @@ import numpy as np
 from OpenGL.GL import (
     GL_FRAGMENT_SHADER,
     GL_NEAREST,
+    GL_NEAREST_MIPMAP_NEAREST,
     GL_REPEAT,
     GL_RGBA8,
     GL_RGBA,
@@ -21,6 +22,7 @@ from OpenGL.GL import (
     glTexImage3D,
     glTexParameteri,
     glUseProgram,
+    glGenerateMipmap,
 )
 from OpenGL.GL.shaders import compileProgram, compileShader, ShaderProgram
 from PIL import Image
@@ -56,7 +58,7 @@ class AssetManager:
 
         self.texture = glGenTextures(1)
         glBindTexture(GL_TEXTURE_2D_ARRAY, self.texture)
-        glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
+        glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST)
         glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
         glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_REPEAT)
         glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_REPEAT)
@@ -83,6 +85,8 @@ class AssetManager:
             GL_UNSIGNED_BYTE, 
             layer_data
         )
+
+        glGenerateMipmap(GL_TEXTURE_2D_ARRAY)
 
     def use_shader(self, name: str) -> None:
         if name not in self.shaders:
