@@ -1,22 +1,11 @@
-from noise import snoise2, snoise3
-from time import time
+from noise import snoise2
 import numpy as np
 from typing import TypeAlias
-
-from .block import back, bottom, front, left, right, top, uv
 
 CHUNK_SIDE = 16
 CHUNK_DIMS = tuple(
     CHUNK_SIDE + 2 for _ in range(3)
 )  # Padding of 2 for neighbouring chunk data
-FACES = [
-    ((0, 0, 1), front.reshape((6, 3))),
-    ((0, 0, -1), back.reshape((6, 3))),
-    ((-1, 0, 0), right.reshape((6, 3))),
-    ((1, 0, 0), left.reshape((6, 3))),
-    ((0, -1, 0), top.reshape((6, 3))),
-    ((0, 1, 0), bottom.reshape((6, 3))),
-]
 
 # TODO: Use enums instead of whatever this is
 NOT_GENERATED = 0
@@ -31,8 +20,7 @@ class Chunk:
         self.state: int = NOT_GENERATED
 
         self.terrain: np.typing.NDArray[np.uint8] = np.zeros(CHUNK_DIMS, dtype=np.uint8)
-        self.vertices: np.typing.NDArray[np.float32] | None = None
-        self.uvs: np.typing.NDArray[np.float32] | None = None
+        self.meshdata: list[float] | None = None
 
     @property
     def id(self) -> str:
@@ -92,44 +80,13 @@ class Chunk:
         self.state = TERRAIN_GENERATED
 
     def generate_mesh(self, world) -> None:
-        if not np.any(self.terrain[1:-1, 1:-1, 1:-1]):
-            self.vertices = np.array([], dtype=np.float32)
-            self.uvs = np.array([], dtype=np.float32)
-            self.state = MESH_GENERATED
-            return
+        # if not np.any(self.terrain[1:-1, 1:-1, 1:-1]):
+            # self.meshdata = np.array([], dtype=np.float32)
+            # self.state = MESH_GENERATED
+            # return
 
-        self.update_neighbour_terrain(world)
-        offset = np.array(self.position) * (CHUNK_SIDE - 1)
-        solid = self.terrain[1:-1, 1:-1, 1:-1] != 0
+        # self.update_neighbour_terrain(world)
 
-        face_data = []
-        total_faces = 0
-
-        for (dx, dy, dz), face in FACES:
-            neighbor = self.terrain[
-                1 + dx : -1 + dx or None,
-                1 + dy : -1 + dy or None,
-                1 + dz : -1 + dz or None,
-            ]
-
-            visible = solid & (neighbor == 0)
-            if not np.any(visible):
-                continue
-
-            x, y, z = np.where(visible)
-            positions = (
-                np.stack((x + 1, y + 1, z + 1), axis=1).astype(np.float32) + offset
-            )
-            translated_faces = face[np.newaxis, :, :] + positions[:, np.newaxis, :]
-            face_data.append(translated_faces.reshape(-1))
-            total_faces += positions.shape[0]
-
-        if face_data:
-            self.vertices = np.hstack(face_data).astype(np.float32)
-            self.uvs = np.tile(uv, (total_faces, 1)).reshape(-1).astype(np.float32)
-        else:
-            self.vertices = np.array([], dtype=np.float32)
-            self.uvs = np.array([], dtype=np.float32)
-
+        self.meshdata = [*(x * CHUNK_SIDE for x in self.position), 0]
         self.state = MESH_GENERATED
 

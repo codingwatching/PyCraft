@@ -1,16 +1,11 @@
 #version 330 core
 
-in float depth;
-in vec2 UV;
+in vec2 v_uv;
+flat in float v_tex_index;
 
-uniform vec3 fogColor;
-uniform float fogStart;
-uniform float fogEnd;
-
-out vec3 color;
-uniform sampler2D myTextureSampler;
+out vec4 out_color;
+uniform sampler2DArray textures;
 
 void main() {
-    float fogFactor = clamp((fogEnd - depth) / (fogEnd - fogStart), 0.0, 1.0);
-    color = mix(fogColor, texture( myTextureSampler, UV ).rgb, fogFactor);
+    out_color = texture(textures, vec3(v_uv, v_tex_index));
 }

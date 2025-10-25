@@ -18,7 +18,6 @@ from OpenGL.GL import (
     glFrontFace,
     glGenVertexArrays,
     glGetUniformLocation,
-    glUniform1f,
     glUniform3f,
     glUniformMatrix4fv,
 )
@@ -27,9 +26,6 @@ try:
     from pyglm import glm
 except ImportError:
     import glm
-
-from terrain.chunk import CHUNK_SIDE
-from terrain.world import RENDER_DIST
 
 from .asset_manager import AssetManager
 from .camera import Camera
@@ -55,34 +51,23 @@ class Renderer:
         self.camera: Camera = Camera(state)
 
     def set_uniforms(self) -> None:
-        model = glm.mat4(1.0)
         view, projection = self.camera.get_matrix()
         camera = (
             self.camera.position[0],
             self.camera.position[1],
             self.camera.position[2],
         )
-        fog_start = 0.1
-        fog_end = CHUNK_SIDE * (RENDER_DIST - 1.25)
 
         if self.asset_manager is None:
             return
         shader = self.asset_manager.get_shader_program("main")
 
-        model_pos = glGetUniformLocation(shader, "model")
         view_pos = glGetUniformLocation(shader, "view")
         projection_pos = glGetUniformLocation(shader, "projection")
-        fogColor_pos = glGetUniformLocation(shader, "fogColor")
-        fogStart_pos = glGetUniformLocation(shader, "fogStart")
-        fogEnd_pos = glGetUniformLocation(shader, "fogEnd")
         camera_pos = glGetUniformLocation(shader, "camera")
 
-        glUniformMatrix4fv(model_pos, 1, GL_FALSE, glm.value_ptr(model))
         glUniformMatrix4fv(view_pos, 1, GL_FALSE, glm.value_ptr(view))
         glUniformMatrix4fv(projection_pos, 1, GL_FALSE, glm.value_ptr(projection))
-        glUniform3f(fogColor_pos, *BACKGROUND)
-        glUniform1f(fogStart_pos, fog_start)
-        glUniform1f(fogEnd_pos, fog_end)
         glUniform3f(camera_pos, *camera)
 
     def drawcall(self) -> None:

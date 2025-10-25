@@ -5,22 +5,19 @@ import numpy as np
 from OpenGL.GL import (
     GL_FRAGMENT_SHADER,
     GL_LINEAR,
-    GL_LINEAR_MIPMAP_LINEAR,
     GL_REPEAT,
-    GL_RGB,
-    GL_TEXTURE_2D,
+    GL_RGBA8,
+    GL_RGBA,
+    GL_TEXTURE_2D_ARRAY,
     GL_TEXTURE_MAG_FILTER,
     GL_TEXTURE_MIN_FILTER,
     GL_TEXTURE_WRAP_S,
     GL_TEXTURE_WRAP_T,
-    GL_UNPACK_ALIGNMENT,
     GL_UNSIGNED_BYTE,
     GL_VERTEX_SHADER,
     glBindTexture,
-    glGenerateMipmap,
     glGenTextures,
-    glPixelStorei,
-    glTexImage2D,
+    glTexImage3D,
     glTexParameteri,
     glUseProgram,
 )
@@ -56,36 +53,35 @@ class AssetManager:
             program: ShaderProgram = compileProgram(vert, frag)
             self.shaders[name_prefix + name] = program
 
+        self.texture = glGenTextures(1)
+        glBindTexture(GL_TEXTURE_2D_ARRAY, self.texture)
+        glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
+        glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+        glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_REPEAT)
+        glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_REPEAT)
+
+        textures = []
+        w, h = -1, -1
+
         texture_dir = os.path.join(asset_dir, "textures/")
         for file in os.listdir(texture_dir):
-            texture = Image.open(os.path.join(texture_dir, file))
-            data: np.typing.NDArray = np.array(texture.getdata())
+            texture = Image.open(os.path.join(texture_dir, file)).convert("RGBA")
+            w, h = texture.size
+            data = np.array(texture)
+            textures.append(data)
 
-            self.texture = glGenTextures(1)
-            glPixelStorei(GL_UNPACK_ALIGNMENT, 1)
-            glBindTexture(GL_TEXTURE_2D, self.texture)
+        if w < 0 or h < 0:
+            return
 
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT)
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT)
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
-            glTexParameteri(
-                GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR
-            )
-
-            glTexImage2D(
-                GL_TEXTURE_2D,
-                0,
-                GL_RGB,
-                texture.size[0],
-                texture.size[1],
-                0,
-                GL_RGB,
-                GL_UNSIGNED_BYTE,
-                data,
-            )
-            glGenerateMipmap(GL_TEXTURE_2D)
-
-            glBindTexture(GL_TEXTURE_2D, 0)
+        layer_data = np.stack(textures, axis=0)
+        glTexImage3D(
+            GL_TEXTURE_2D_ARRAY, 
+            0, GL_RGBA8, 
+            w, h, len(textures),
+            0, GL_RGBA, 
+            GL_UNSIGNED_BYTE, 
+            layer_data
+        )
 
     def use_shader(self, name: str) -> None:
         if name not in self.shaders:
@@ -104,5 +100,5 @@ class AssetManager:
     def bind_texture(self) -> None:
         if self.texture is None:
             return
-        glBindTexture(GL_TEXTURE_2D, self.texture)
+        glBindTexture(GL_TEXTURE_2D_ARRAY, self.texture)
 

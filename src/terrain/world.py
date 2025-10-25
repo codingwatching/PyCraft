@@ -97,8 +97,7 @@ class ChunkStorage:
         self.changed = True
 
     def generate_mesh_data(self):
-        vertices = []
-        uvs = []
+        data = []
 
         for id in list(self.chunks.keys()):
             chunk = self.chunks[id]
@@ -106,13 +105,11 @@ class ChunkStorage:
             if chunk.state != MESH_GENERATED:
                 continue
 
-            vertices.append(chunk.vertices)
-            uvs.append(chunk.uvs)
+            data.extend(chunk.meshdata)
 
         try:
-            vertices = np.hstack(vertices)
-            uvs = np.hstack(uvs)
-            return (vertices, uvs)
+            data = np.array(data, dtype=np.float32)
+            return data
         except ValueError:
             return None
 
@@ -224,7 +221,7 @@ class World:
         if data is None:
             return
 
-        self.mesh.set_data(*data)
+        self.mesh.set_data(data)
 
     def on_close(self) -> None:
         self.handler.kill()

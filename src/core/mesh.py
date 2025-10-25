@@ -12,11 +12,12 @@ from OpenGL.GL import (
     glBufferSubData,
     glDeleteBuffers,
     glDisableVertexAttribArray,
-    glDrawArrays,
+    glDrawArraysInstanced,
     glEnableVertexAttribArray,
     glFlush,
     glGenBuffers,
     glVertexAttribPointer,
+    glVertexAttribDivisor,
 )
 
 from .state import State
@@ -45,8 +46,7 @@ class DisposableBuffer:
         glDeleteBuffers(1, self.buffer)
         del self.data
 
-BufferSet: TypeAlias = tuple[DisposableBuffer, DisposableBuffer]
-BufferList: TypeAlias = list[BufferSet]
+BufferList: TypeAlias = list[DisposableBuffer]
 
 class Mesh:
     def __init__(
@@ -57,67 +57,58 @@ class Mesh:
         self.state: State = state
         self.last_data_hash = None
 
-    def get_latest_buffer(self) -> BufferSet | None:
+    def get_latest_buffer(self) -> DisposableBuffer | None:
         latest = None
         for buffer in self.buffers:
-            if not buffer[0].ready or not buffer[1].ready:
+            if not buffer.ready:
                 continue
             latest = buffer
             break
         return latest
 
-    def set_data(self, vertices: BufferData, uvs: BufferData) -> None:
-        vertices.flags.writeable = False
-        uvs.flags.writeable = False
-        data_hash = hash(str(vertices) + str(uvs))
+    def set_data(self, data: BufferData) -> None:
+        data.flags.writeable = False
+        data_hash = hash(data.tobytes())
 
         if self.last_data_hash == data_hash:
             return
 
-        vertex_buf = DisposableBuffer(vertices, VERTEX)
-        uv_buf = DisposableBuffer(uvs, UV)
-        self.buffers.insert(0, (vertex_buf, uv_buf))
+        buffer = DisposableBuffer(data)
+        self.buffers.insert(0, buffer)
         self.last_data_hash = data_hash
 
     def render(self) -> None:
-        buffers = self.get_latest_buffer()
-        if buffers is None:
+        buffer = self.get_latest_buffer()
+        if buffer is None:
             return
-        vertex, uv = buffers
 
-        glBindBuffer(GL_ARRAY_BUFFER, vertex.buffer)
+        glBindBuffer(GL_ARRAY_BUFFER, buffer.buffer)
         glEnableVertexAttribArray(0)
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, None)
+        glVertexAttribPointer(0,4,GL_FLOAT,GL_FALSE,0,None)
+        glVertexAttribDivisor(0,1)
 
-        glBindBuffer(GL_ARRAY_BUFFER, uv.buffer)
-        glEnableVertexAttribArray(1)
-        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, None)
-
-        glDrawArrays(GL_TRIANGLES, 0, len(vertex.data) // 3)
+        glDrawArraysInstanced(GL_TRIANGLES, 0, 36, len(buffer.data))
 
         glDisableVertexAttribArray(0)
-        glDisableVertexAttribArray(1)
         glBindBuffer(GL_ARRAY_BUFFER, 0)
 
     def update_buffers(self) -> None:
-        for vertex, uv in self.buffers:
-            if not vertex.ready:
-                vertex.send_to_gpu()
-            if not uv.ready:
-                uv.send_to_gpu()
+        for buffer in self.buffers:
+            if not buffer.ready:
+                buffer.send_to_gpu()
 
         to_delete = []
         latest = self.get_latest_buffer()
-        for vertex, uv in self.buffers:
-            if (vertex, uv) == latest:
+        for buffer in self.buffers:
+            if buffer == latest:
                 continue
-            if vertex.ready and uv.ready:
-                to_delete.append((vertex, uv))
+            if not buffer:
+                continue
+            to_delete.append(buffer)
 
-        for vertex, uv in to_delete:
-            self.buffers.remove((vertex, uv))
-            del vertex
-            del uv
+        for buffer in to_delete:
+            self.buffers.remove(buffer)
+            del buffer
 
     def on_close(self) -> None:
         del self.buffers
