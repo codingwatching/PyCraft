@@ -1,4 +1,5 @@
 from random import randint
+from time import time
 from noise import snoise2
 import numpy as np
 from typing import TypeAlias
@@ -88,22 +89,31 @@ class Chunk:
                 self.terrain[dest_slice] = neighbor.terrain[source]
 
     def generate_terrain(self) -> None:
-        terrain = np.ones((CHUNK_SIDE, CHUNK_SIDE, CHUNK_SIDE), dtype=np.uint8)
+        # World coordinates
+        x_coords = np.arange(CHUNK_SIDE) + self.position[0] * CHUNK_SIDE
+        z_coords = np.arange(CHUNK_SIDE) + self.position[2] * CHUNK_SIDE
+        y_coords = np.arange(CHUNK_SIDE) + self.position[1] * CHUNK_SIDE
 
-        for x in range(CHUNK_SIDE):
-            i = self.position[0] * CHUNK_SIDE + x
-            for z in range(CHUNK_SIDE):
-                k = self.position[2] * CHUNK_SIDE + z
-                for y in range(CHUNK_SIDE):
-                    j = self.position[1] * CHUNK_SIDE + y
-                    height = snoise2(i / 100, k / 100) * 10
-                    terrain[x, y, z] = j < height
+        # Preallocate terrain
+        terrain = np.zeros((CHUNK_SIDE, CHUNK_SIDE, CHUNK_SIDE), dtype=np.uint8)
+
+        # Flatten XZ grid for faster noise computation
+        x_flat, z_flat = np.meshgrid(x_coords, z_coords, indexing='ij')
+        x_flat = x_flat.ravel()
+        z_flat = z_flat.ravel()
+
+        # Compute heights in a single comprehension
+        heights = np.array([snoise2(ix / 100, iz / 100) * 10 for ix, iz in zip(x_flat, z_flat)], dtype=np.float32)
+        heights = heights.reshape(CHUNK_SIDE, CHUNK_SIDE)
+
+        # Broadcast y_coords to compare against heights
+        terrain[:, :, :] = (y_coords[None, :, None] < heights[:, None, :]).astype(np.uint8)
 
         self.terrain[1:-1, 1:-1, 1:-1] = terrain
         self.state = TERRAIN_GENERATED
 
     def generate_mesh(self, world) -> None:
-        if not np.any(self.terrain[1:-1, 1:-1, 1:-1]):
+        if not np.any(self.terrain):
             self.state = MESH_GENERATED
             return
 

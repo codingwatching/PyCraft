@@ -1,4 +1,5 @@
 from math import dist
+import threading
 import multiprocessing
 
 import numpy as np
@@ -6,10 +7,10 @@ import numpy as np
 from core.mesh import Mesh, BufferData
 from core.state import State
 
-from .chunk import CHUNK_SIDE, MESH_GENERATED, Chunk, ChunkMeshData
+from .chunk import CHUNK_SIDE, MESH_GENERATED, Chunk
 
-RENDER_DIST = 2
-BATCH_SIZE = min([RENDER_DIST ** 2, 128])
+RENDER_DIST = 12
+BATCH_SIZE = multiprocessing.cpu_count()
 
 
 class ChunkStorage:
@@ -148,18 +149,25 @@ class ChunkStorage:
 
         for position in to_delete:
             del self.cache[position]
+            
+        self.build_queue = self.sort_by_distance(self.build_queue)
+        self.rebuild_queue = self.sort_by_distance(self.rebuild_queue)
 
         count = 0
+        threads = []
         while len(self.build_queue) > 0 and count < BATCH_SIZE:
-            self.build_queue = self.sort_by_distance(self.build_queue)
             position = self.build_queue.pop(0)
-            self.build_chunk(position)
+            threads.append(threading.Thread(target=self.build_chunk, args=[position], daemon=True))
+            threads[-1].start()
             count += 1
 
         while len(self.rebuild_queue) > 0:
-            self.rebuild_queue = self.sort_by_distance(self.rebuild_queue)
             position = self.rebuild_queue.pop(0)
-            self.rebuild_chunk(position)
+            threads.append(threading.Thread(target=self.rebuild_chunk, args=[position], daemon=True))
+            threads[-1].start()
+
+        for thread in threads:
+            thread.join()
 
 class ChunkHandler:
     def __init__(self):
