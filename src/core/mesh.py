@@ -5,7 +5,7 @@ from OpenGL.GL import (
     GL_ARRAY_BUFFER,
     GL_FALSE,
     GL_FLOAT,
-    GL_STATIC_DRAW,
+    GL_DYNAMIC_DRAW,
     GL_TRIANGLES,
     glBindBuffer,
     glBufferData,
@@ -37,7 +37,7 @@ class DisposableBuffer:
 
     def send_to_gpu(self) -> None:
         glBindBuffer(GL_ARRAY_BUFFER, self.buffer)
-        glBufferData(GL_ARRAY_BUFFER, self.data.nbytes, None, GL_STATIC_DRAW)
+        glBufferData(GL_ARRAY_BUFFER, self.data.nbytes, None, GL_DYNAMIC_DRAW)
         glBufferSubData(GL_ARRAY_BUFFER, 0, self.data.nbytes, self.data)
         glFlush()
         self.ready = True
