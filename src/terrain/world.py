@@ -1,4 +1,5 @@
 from math import dist
+from time import sleep
 import threading
 import multiprocessing
 
@@ -9,9 +10,9 @@ from core.state import State
 
 from .chunk import CHUNK_HEIGHT, CHUNK_SIDE, MESH_GENERATED, Chunk
 
-RENDER_DIST = 8
+RENDER_DIST = 5
 RENDER_HEIGHT = 3
-BATCH_SIZE = multiprocessing.cpu_count()
+BATCH_SIZE = 64
 
 
 class ChunkStorage:
@@ -193,6 +194,7 @@ class ChunkHandler:
             storage.update(namespace.camera_chunk)
 
             if not storage.changed:
+                sleep(1/60)
                 continue
 
             namespace.mesh_data = storage.generate_mesh_data()

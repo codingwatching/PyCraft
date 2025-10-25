@@ -1,8 +1,7 @@
-from random import randint
-from time import time
 from noise import snoise2
 import numpy as np
 from typing import TypeAlias
+from functools import lru_cache
 
 CHUNK_SIDE = 16
 CHUNK_HEIGHT = 64
@@ -32,6 +31,14 @@ FACES = [
     (TOP,    (0,  1,  0)),
     (BOTTOM, (0, -1,  0)),
 ]
+
+# noise fn
+@lru_cache()
+def fractal_noise(x, z):
+    return (
+        snoise2(x / 100, z / 100) * 10 +
+        snoise2(x / 1000, z / 1000) * 100
+    )
 
 PositionType: TypeAlias = tuple[int, int, int]
 
@@ -97,7 +104,7 @@ class Chunk:
         z_coords = np.arange(CHUNK_SIDE) + self.position[2] * CHUNK_SIDE
 
         x_grid, z_grid = np.meshgrid(x_coords, z_coords, indexing='ij')
-        heights = np.vectorize(lambda x, z: snoise2(x / 100, z / 100) * 10)(x_grid, z_grid)
+        heights = np.vectorize(lambda x, z: fractal_noise(x, z))(x_grid, z_grid)
         heights = heights.astype(np.float32)
 
         terrain = (y_coords[None, :, None] < heights[:, None, :]).astype(np.uint8)
