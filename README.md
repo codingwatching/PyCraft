@@ -7,8 +7,18 @@ Meet Voxl, a highly optimized infinite procedural voxel terrain generating thing
 
 ## Features
 - Infinite terrain with no bounds in any axis. (yes, no height limit!)
-- OpenSimplex-based terrain generation with caves (very wip)
-- Terrain is just stone for now, multiple materials coming soon.
+- Simplex noise-based terrain generation (very wip)
+
+## Roadmap
+- Clean and format up code / style
+- Implement logging
+- Don't render faces that can't be seen (render cube faces independently)
+- Implement multiple block types
+- Actual player movement
+- Destructible terrain
+- Load/save worlds
+- Block shading/lighting, day/night cycle
+- More incoming?
 
 ## Usage
 
@@ -48,10 +58,11 @@ Unlock mouse  : esc
 ```
 
 ## Performance
-Coming soon! (benchmarks.md, optimizations.md)
+Coming soon! (benchmarks, optimizations)
 
 ## Screenshots
 Coming soon!
 
 ## Contributing
 Coming soon!
+
