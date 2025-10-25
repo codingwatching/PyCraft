@@ -1,3 +1,4 @@
+from random import randint
 from noise import snoise2
 import numpy as np
 from typing import TypeAlias
@@ -80,13 +81,25 @@ class Chunk:
         self.state = TERRAIN_GENERATED
 
     def generate_mesh(self, world) -> None:
-        # if not np.any(self.terrain[1:-1, 1:-1, 1:-1]):
-            # self.meshdata = np.array([], dtype=np.float32)
-            # self.state = MESH_GENERATED
-            # return
+        self.meshdata = []
 
-        # self.update_neighbour_terrain(world)
+        if not np.any(self.terrain[1:-1, 1:-1, 1:-1]):
+            self.state = MESH_GENERATED
+            return
 
-        self.meshdata = [*(x * CHUNK_SIDE for x in self.position), 0]
+        self.update_neighbour_terrain(world)
+
+        for x in range(CHUNK_SIDE):
+            for y in range(CHUNK_SIDE):
+                for z in range(CHUNK_SIDE):
+                    i, j, k = x+1, y+1, z+1
+                    if self.terrain[i][j][k]:
+                        self.meshdata.append([
+                            self.position[0] * CHUNK_SIDE + x,
+                            self.position[1] * CHUNK_SIDE + y,
+                            self.position[2] * CHUNK_SIDE + z,
+                            randint(0,2)
+                        ])
+
         self.state = MESH_GENERATED
 

@@ -1,10 +1,11 @@
 import os
 from typing import Any
 
+from OpenGL.raw.GL.VERSION.GL_1_1 import GL_NEAREST_MIPMAP_NEAREST
 import numpy as np
 from OpenGL.GL import (
     GL_FRAGMENT_SHADER,
-    GL_LINEAR,
+    GL_NEAREST,
     GL_REPEAT,
     GL_RGBA8,
     GL_RGBA,
@@ -55,8 +56,8 @@ class AssetManager:
 
         self.texture = glGenTextures(1)
         glBindTexture(GL_TEXTURE_2D_ARRAY, self.texture)
-        glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
-        glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+        glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
+        glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
         glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_REPEAT)
         glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_REPEAT)
 

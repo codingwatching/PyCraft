@@ -5,7 +5,7 @@ import glfw
 from core.state import State
 
 
-# TODO: Clean up this old mess
+# TODO: Clean up this ancient mess
 class Player:
     def __init__(self, state: State):
         self.state: State = state

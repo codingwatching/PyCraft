@@ -6,10 +6,10 @@ import numpy as np
 from core.mesh import Mesh, BufferData
 from core.state import State
 
-from .chunk import CHUNK_SIDE, MESH_GENERATED, TERRAIN_GENERATED, Chunk
+from .chunk import CHUNK_SIDE, MESH_GENERATED, Chunk
 
-RENDER_DIST = 7
-BATCH_SIZE = min([RENDER_DIST ** 2, 42])
+RENDER_DIST = 2
+BATCH_SIZE = min([RENDER_DIST ** 2, 128])
 
 
 class ChunkStorage:
@@ -118,9 +118,9 @@ class ChunkStorage:
         self.camera_chunk = camera_chunk
 
         required_chunks = set()
-        for x in range(-RENDER_DIST - 1, RENDER_DIST):
-            for y in range(-RENDER_DIST - 1, RENDER_DIST):
-                for z in range(-RENDER_DIST - 1, RENDER_DIST):
+        for x in range(-RENDER_DIST, RENDER_DIST):
+            for y in range(-RENDER_DIST, RENDER_DIST):
+                for z in range(-RENDER_DIST, RENDER_DIST):
                     translated_x = x + camera_chunk[0]
                     translated_y = y + camera_chunk[1]
                     translated_z = z + camera_chunk[2]
@@ -129,21 +129,18 @@ class ChunkStorage:
         for required in required_chunks:
             self.ensure_chunk(required)
 
-        # todo varname "chunk" is kinda misleading, it stores a position!
-        # from here...
         to_delete = set(self.chunks.keys()) - required_chunks
-        for chunk in to_delete:
-            self.cache_chunk(chunk)
+        for position in to_delete:
+            self.cache_chunk(position)
 
         to_delete = []
-        for chunk in self.cache:
-            distance = dist(chunk, camera_chunk)
+        for position in self.cache:
+            distance = dist(position, camera_chunk)
             if distance > RENDER_DIST * 3:
-                to_delete.append(chunk)
+                to_delete.append(position)
 
-        for chunk in to_delete:
-            del self.cache[chunk]
-        # ...to here.
+        for position in to_delete:
+            del self.cache[position]
 
         count = 0
         while len(self.build_queue) > 0 and count < BATCH_SIZE:
