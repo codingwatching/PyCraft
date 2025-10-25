@@ -211,7 +211,7 @@ class World:
     def update(self) -> None:
         player_position = self.state.camera.position
         camera_chunk = tuple(
-            (int(player_position[i] // (CHUNK_SIDE - 1)) for i in range(3))
+            (int(player_position[i] // CHUNK_SIDE) for i in range(3))
         )
         self.handler.set_camera_chunk(camera_chunk)
 
