@@ -13,8 +13,9 @@ Meet Voxl, a highly optimized infinite procedural voxel terrain generating thing
 - Clean and format up code / style
 - Implement logging
 - Implement multiple block types
+- LOD system
 - Actual player movement
-- Destructible terrain
+- Destructible terrain (break/place blocks)
 - Load/save worlds
 - Block shading/lighting, day/night cycle
 - More incoming?

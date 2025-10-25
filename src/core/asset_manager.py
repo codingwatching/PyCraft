@@ -33,12 +33,14 @@ ASSET_DIR = "./assets/"
 
 
 class AssetManager:
+    texture: int
+
     def __init__(self, state: State) -> None:
         self.state: State = state
         self.state.asset_manager = self
 
         self.shaders: dict[str, ShaderProgram] = {}
-        self.texture: np.uint32 | None = None
+        self.texture = 0
 
     def load_assets(self, asset_dir: str = ASSET_DIR, name_prefix: str = "") -> None:
         shader_dir = os.path.join(asset_dir, "shaders/")
@@ -50,13 +52,13 @@ class AssetManager:
 
         for name in shader_pairs:
             with open(os.path.join(shader_dir, name + ".vert")) as f:
-                vert: int = compileShader(f.read(), GL_VERTEX_SHADER)
+                vert: np.uint32 = compileShader(f.read(), GL_VERTEX_SHADER)
             with open(os.path.join(shader_dir, name + ".frag")) as f:
-                frag: int = compileShader(f.read(), GL_FRAGMENT_SHADER)
+                frag: np.uint32 = compileShader(f.read(), GL_FRAGMENT_SHADER)
             program: ShaderProgram = compileProgram(vert, frag)
             self.shaders[name_prefix + name] = program
 
-        self.texture = glGenTextures(1)
+        self.texture: np.uint32 = glGenTextures(1)
         glBindTexture(GL_TEXTURE_2D_ARRAY, self.texture)
         glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST)
         glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST)

@@ -1,3 +1,9 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .world import World, Position
+
 from noise import snoise2
 import numpy as np
 from typing import TypeAlias
@@ -34,19 +40,20 @@ FACES = [
 
 # noise fn
 @lru_cache()
-def fractal_noise(x, z):
+def fractal_noise(x: float, z: float) -> float:
     return (
         snoise2(x / 100, z / 100) * 10 +
-        snoise2(x / 1000, z / 1000) * 100
+        snoise2(x / 1000, z / 1000) * 100 +
+        snoise2(x / 10000, z / 10000) * 1000
     )
 
 PositionType: TypeAlias = tuple[int, int, int]
 
 class ChunkMeshData:
     def __init__(self):
-        self.position = []
-        self.orientation = []
-        self.tex_id = []
+        self.position: list[list[float]] = []
+        self.orientation: list[int] = []
+        self.tex_id: list[float] = []
 
 class Chunk:
     def __init__(self, position: PositionType):
@@ -57,14 +64,11 @@ class Chunk:
         self.meshdata: ChunkMeshData = ChunkMeshData()
 
     @property
-    def id(self) -> str:
+    def id_string(self) -> str:
         return f"chunk_{self.position[0]}_{self.position[1]}_{self.position[2]}"
 
-    def is_air(self, x: int, y: int, z: int) -> bool:
-        return self.terrain[x, y, z] == 0
-
-    def update_neighbour_terrain(self, world) -> None:
-        neighbour_dirs = {
+    def update_neighbour_terrain(self, world: World) -> None:
+        neighbour_dirs: dict[Position, tuple[slice, slice, slice]] = {
             (1, 0, 0): (slice(-1, None), slice(1, -1), slice(1, -1)),
             (-1, 0, 0): (slice(0, 1), slice(1, -1), slice(1, -1)),
             (0, 1, 0): (slice(1, -1), slice(-1, None), slice(1, -1)),
@@ -73,16 +77,17 @@ class Chunk:
             (0, 0, -1): (slice(1, -1), slice(1, -1), slice(0, 1)),
         }
 
-        center = (slice(1, -1), slice(1, -1), slice(1, -1))
+        center: tuple[slice, slice, slice] = (slice(1, -1), slice(1, -1), slice(1, -1))
 
         for (dx, dy, dz), dest_slice in neighbour_dirs.items():
-            neighbor_pos = (
+            neighbor_pos: Position = (
                 self.position[0] + dx,
                 self.position[1] + dy,
                 self.position[2] + dz,
             )
             if world.chunk_exists(neighbor_pos):
                 neighbor = world.chunks[neighbor_pos]
+
                 if dx == 1:
                     source = (slice(1, 2),) + center[1:]
                 elif dx == -1:
@@ -99,6 +104,7 @@ class Chunk:
                 self.terrain[dest_slice] = neighbor.terrain[source]
 
     def generate_terrain(self) -> None:
+        # left here
         x_coords = np.arange(CHUNK_SIDE) + self.position[0] * CHUNK_SIDE
         y_coords = np.arange(CHUNK_HEIGHT) + self.position[1] * CHUNK_HEIGHT
         z_coords = np.arange(CHUNK_SIDE) + self.position[2] * CHUNK_SIDE

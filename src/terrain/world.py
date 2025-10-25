@@ -2,8 +2,10 @@ from math import dist
 from time import sleep
 import threading
 import multiprocessing
+from multiprocessing.managers import SyncManager, NamespaceProxy
 
 import numpy as np
+import numpy.typing as npt
 
 from core.mesh import Mesh, BufferData
 from core.state import State
@@ -14,17 +16,25 @@ RENDER_DIST = 5
 RENDER_HEIGHT = 3
 BATCH_SIZE = 64
 
+Position = tuple[int, int, int] # todo move this somewhere more relevant
 
 class ChunkStorage:
+    chunks: dict[Position, Chunk]
+    cache: dict[Position, Chunk]
+    build_queue: list[Position]
+    rebuild_queue: list[Position]
+    camera_chunk: Position | None
+    changed: bool
+
     def __init__(self) -> None:
         self.chunks = {}
         self.cache = {}
-        self.rebuild_queue = []
         self.build_queue = []
+        self.rebuild_queue = []
         self.camera_chunk = None
         self.changed = False
 
-    def ensure_chunk(self, position):
+    def ensure_chunk(self, position: Position):
         if position in self.chunks:
             return
         if position in self.cache:
@@ -35,19 +45,19 @@ class ChunkStorage:
         self.chunks[position] = chunk
         self.build_queue.append(position)
 
-    def cache_chunk(self, position):
+    def cache_chunk(self, position: Position):
         self.cache[position] = self.chunks[position]
         del self.chunks[position]
 
-    def uncache_chunk(self, position):
+    def uncache_chunk(self, position: Position):
         self.chunks[position] = self.cache[position]
         del self.cache[position]
 
-    def chunk_exists(self, position) -> bool:
+    def chunk_exists(self, position: Position) -> bool:
         return position in self.chunks
 
-    def get_neighbours(self, id) -> list[Chunk]:
-        x, y, z = id
+    def get_neighbours(self, position: Position) -> list[Chunk]:
+        x, y, z = position
         directions = [
             (1, 0, 0),
             (-1, 0, 0),
@@ -57,7 +67,7 @@ class ChunkStorage:
             (0, 0, -1),
         ]
 
-        neighbours = []
+        neighbours: list[Chunk] = []
         for dx, dy, dz in directions:
             neighbour_id = (x + dx, y + dy, z + dz)
             if neighbour_id in self.chunks:
@@ -65,16 +75,18 @@ class ChunkStorage:
 
         return neighbours
 
-    def notify_neighbours(self, id) -> None:
-        neighbours = self.get_neighbours(id)
+    def notify_neighbours(self, position: Position) -> None:
+        neighbours = self.get_neighbours(position)
         for chunk in neighbours:
             self.rebuild_queue.append(chunk.position)
 
-    def sort_by_distance(self, positions):
+    def sort_by_distance(self, positions: list[Position]) -> list[Position]:
+        if self.camera_chunk is None:
+            return positions
         return sorted(positions, key=lambda x: dist(x, self.camera_chunk))
 
-    def build_chunk(self, position):
-        if not position in self.chunks:
+    def build_chunk(self, position: Position):
+        if position not in self.chunks:
             self.ensure_chunk(position)
 
         self.chunks[position].generate_terrain()
@@ -85,8 +97,8 @@ class ChunkStorage:
 
         self.changed = True
 
-    def rebuild_chunk(self, position) -> None:
-        if not position in self.chunks:
+    def rebuild_chunk(self, position: Position) -> None:
+        if position not in self.chunks:
             self.ensure_chunk(position)
         chunk = None
 
@@ -101,10 +113,10 @@ class ChunkStorage:
         chunk.generate_mesh(self)
         self.changed = True
 
-    def generate_mesh_data(self):
-        position = []
-        orientation = []
-        tex_id = []
+    def generate_mesh_data(self) -> tuple[npt.NDArray, npt.NDArray, npt.NDArray]:
+        position: list[list[float]] = []
+        orientation: list[int] = []
+        tex_id: list[float] = []
 
         for id in list(self.chunks.keys()):
             chunk = self.chunks[id]
@@ -118,38 +130,43 @@ class ChunkStorage:
             tex_id.extend(data.tex_id)
 
         try:
-            position = np.array(position, dtype=np.float32)
-            orientation = np.array(orientation, dtype=np.float32)
-            tex_id = np.array(tex_id, dtype=np.float32)
-            return (position, orientation, tex_id)
+            return (
+                np.array(position, dtype = np.float32),
+                np.array(orientation, dtype = np.float32),
+                np.array(tex_id, dtype = np.float32)
+            )
         except ValueError:
             return None
 
-    def update(self, camera_chunk):
+    def update(self, camera_chunk: Position):
         self.changed = False
         self.camera_chunk = camera_chunk
 
-        required_chunks = set()
+        required_chunks: set[Position] = set()
         for x in range(-RENDER_DIST, RENDER_DIST + 1):
             for y in range(-RENDER_HEIGHT, RENDER_HEIGHT + 1):
                 for z in range(-RENDER_DIST, RENDER_DIST + 1):
                     translated_x = x + camera_chunk[0]
                     translated_y = y + camera_chunk[1]
                     translated_z = z + camera_chunk[2]
-                    required_chunks.add((translated_x, translated_y, translated_z))
+                    required_chunks.add((
+                        translated_x, 
+                        translated_y, 
+                        translated_z
+                    ))
 
         for required in required_chunks:
             self.ensure_chunk(required)
 
-        to_delete = set(self.chunks.keys()) - required_chunks
+        to_delete: set[Position] = set(self.chunks.keys()) - required_chunks
         for position in to_delete:
             self.cache_chunk(position)
 
-        to_delete = []
+        to_delete = set()
         for position in self.cache:
             distance = dist(position, camera_chunk)
             if distance > RENDER_DIST * 4:
-                to_delete.append(position)
+                to_delete.add(position)
 
         for position in to_delete:
             del self.cache[position]
@@ -158,22 +175,34 @@ class ChunkStorage:
         self.rebuild_queue = self.sort_by_distance(self.rebuild_queue)
 
         count = 0
-        threads = []
+        threads: list[threading.Thread] = []
         while len(self.build_queue) > 0 and count < BATCH_SIZE:
             position = self.build_queue.pop(0)
-            threads.append(threading.Thread(target=self.build_chunk, args=[position], daemon=True))
+            threads.append(threading.Thread(
+                target = self.build_chunk, 
+                args = [position], 
+                daemon = True
+            ))
             threads[-1].start()
             count += 1
 
         while len(self.rebuild_queue) > 0:
             position = self.rebuild_queue.pop(0)
-            threads.append(threading.Thread(target=self.rebuild_chunk, args=[position], daemon=True))
+            threads.append(threading.Thread(
+                target = self.rebuild_chunk,
+                args = [position],
+                daemon = True
+            ))
             threads[-1].start()
 
         for thread in threads:
             thread.join()
 
 class ChunkHandler:
+    manager: SyncManager
+    namespace: NamespaceProxy
+    process: multiprocessing.Process
+
     def __init__(self):
         self.manager = multiprocessing.Manager()
         self.namespace = self.manager.Namespace()
@@ -187,7 +216,7 @@ class ChunkHandler:
         )
         self.process.start()
 
-    def worker(self, namespace):
+    def worker(self, namespace: NamespaceProxy) -> None:
         storage = ChunkStorage()
 
         while self.namespace.alive:
@@ -209,7 +238,7 @@ class ChunkHandler:
     def changed(self) -> bool:
         return self.namespace.changed
 
-    def set_camera_chunk(self, position) -> None:
+    def set_camera_chunk(self, position: Position) -> None:
         self.namespace.camera_chunk = position
 
     def kill(self) -> None:
@@ -225,7 +254,7 @@ class World:
         self.mesh: Mesh = self.state.mesh_handler.new_mesh("world")
 
     def update(self) -> None:
-        player_position = self.state.camera.position
+        player_position: Position = self.state.camera.position
         camera_chunk = (
             player_position[0] // CHUNK_SIDE,
             player_position[1] // CHUNK_HEIGHT,
