@@ -6,7 +6,7 @@ import numpy as np
 from core.mesh import Mesh, BufferData
 from core.state import State
 
-from .chunk import CHUNK_SIDE, MESH_GENERATED, Chunk
+from .chunk import CHUNK_SIDE, MESH_GENERATED, Chunk, ChunkMeshData
 
 RENDER_DIST = 2
 BATCH_SIZE = min([RENDER_DIST ** 2, 128])
@@ -97,7 +97,8 @@ class ChunkStorage:
         self.changed = True
 
     def generate_mesh_data(self):
-        data = []
+        position = []
+        tex_id = []
 
         for id in list(self.chunks.keys()):
             chunk = self.chunks[id]
@@ -105,11 +106,14 @@ class ChunkStorage:
             if chunk.state != MESH_GENERATED:
                 continue
 
-            data.extend(chunk.meshdata)
+            data = chunk.meshdata
+            position.extend(data.position)
+            tex_id.extend(data.tex_id)
 
         try:
-            data = np.array(data, dtype=np.float32)
-            return data
+            position = np.array(position, dtype=np.float32)
+            tex_id = np.array(tex_id, dtype=np.float32)
+            return (position, tex_id)
         except ValueError:
             return None
 
@@ -218,7 +222,7 @@ class World:
         if data is None:
             return
 
-        self.mesh.set_data(data)
+        self.mesh.set_data(*data)
 
     def on_close(self) -> None:
         self.handler.kill()

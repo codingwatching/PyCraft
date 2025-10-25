@@ -1,6 +1,7 @@
-#version 330 core
+# version 330 core
 
-layout(location = 0) in vec4 instances;
+layout(location = 0) in vec3 position;
+layout(location = 1) in float tex_id;
 
 out vec3 v_pos;
 flat out float v_tex_index;
@@ -73,9 +74,9 @@ vec2 cubeUV(int idx) {
 void main() {
     int vert_id = gl_VertexID % 36;
     vec3 local_pos = cubeVertex(vert_id);
-    vec3 world_pos = instances.xyz + local_pos;
+    vec3 world_pos = position + local_pos;
     gl_Position = projection * view * vec4(world_pos,1.0);
     v_pos = local_pos;
-    v_tex_index = instances.w;
+    v_tex_index = tex_id;
     v_uv = cubeUV(vert_id);
 }

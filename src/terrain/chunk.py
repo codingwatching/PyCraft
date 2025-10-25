@@ -15,13 +15,18 @@ MESH_GENERATED = 2
 
 PositionType: TypeAlias = tuple[int, int, int]
 
+class ChunkMeshData:
+    def __init__(self):
+        self.position = []
+        self.tex_id = []
+
 class Chunk:
     def __init__(self, position: PositionType):
         self.position: PositionType = position
         self.state: int = NOT_GENERATED
 
         self.terrain: np.typing.NDArray[np.uint8] = np.zeros(CHUNK_DIMS, dtype=np.uint8)
-        self.meshdata: list[float] | None = None
+        self.meshdata: ChunkMeshData = ChunkMeshData()
 
     @property
     def id(self) -> str:
@@ -81,25 +86,28 @@ class Chunk:
         self.state = TERRAIN_GENERATED
 
     def generate_mesh(self, world) -> None:
-        self.meshdata = []
-
         if not np.any(self.terrain[1:-1, 1:-1, 1:-1]):
             self.state = MESH_GENERATED
             return
 
         self.update_neighbour_terrain(world)
 
+        position = []
+        tex_id = []
         for x in range(CHUNK_SIDE):
             for y in range(CHUNK_SIDE):
                 for z in range(CHUNK_SIDE):
                     i, j, k = x+1, y+1, z+1
                     if self.terrain[i][j][k]:
-                        self.meshdata.append([
+                        tex_id.append(randint(0,2))
+                        position.append([
                             self.position[0] * CHUNK_SIDE + x,
                             self.position[1] * CHUNK_SIDE + y,
                             self.position[2] * CHUNK_SIDE + z,
-                            randint(0,2)
                         ])
+
+        self.meshdata.position = position
+        self.meshdata.tex_id = tex_id
 
         self.state = MESH_GENERATED
 

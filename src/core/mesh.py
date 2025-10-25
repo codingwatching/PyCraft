@@ -1,11 +1,11 @@
+import ctypes
 from typing import TypeAlias
 
 import numpy as np
 from OpenGL.GL import (
     GL_ARRAY_BUFFER,
-    GL_FALSE,
     GL_FLOAT,
-    GL_DYNAMIC_DRAW,
+    GL_STATIC_DRAW,
     GL_TRIANGLES,
     glBindBuffer,
     glBufferData,
@@ -23,23 +23,24 @@ from OpenGL.GL import (
 from .state import State
 
 BufferData: TypeAlias = np.typing.NDArray[np.float32]
-
-VERTEX = 2
-UV = 3
+instance_dtype = np.dtype([
+    ("position", np.float32, 3),
+    ("tex_id", np.float32)
+])
 
 
 class DisposableBuffer:
-    def __init__(self, data: BufferData, type: int = VERTEX) -> None:
+    def __init__(self, data: BufferData) -> None:
         self.data: BufferData = data
-        self.type: int = type
         self.buffer: np.uint32 = glGenBuffers(1)
         self.ready: bool = False
 
     def send_to_gpu(self) -> None:
         glBindBuffer(GL_ARRAY_BUFFER, self.buffer)
-        glBufferData(GL_ARRAY_BUFFER, self.data.nbytes, None, GL_DYNAMIC_DRAW)
+        glBufferData(GL_ARRAY_BUFFER, self.data.nbytes, None, GL_STATIC_DRAW)
         glBufferSubData(GL_ARRAY_BUFFER, 0, self.data.nbytes, self.data)
         glFlush()
+
         self.ready = True
 
     def __del__(self) -> None:
@@ -55,7 +56,6 @@ class Mesh:
     ) -> None:
         self.buffers: BufferList = []
         self.state: State = state
-        self.last_data_hash = None
 
     def get_latest_buffer(self) -> DisposableBuffer | None:
         latest = None
@@ -66,16 +66,16 @@ class Mesh:
             break
         return latest
 
-    def set_data(self, data: BufferData) -> None:
-        data.flags.writeable = False
-        data_hash = hash(data.tobytes())
+    def set_data(self, position: BufferData, tex_id: BufferData) -> None:
+        if len(position) != len(tex_id):
+            raise RuntimeError("position and tex_id buffer lengths don't match 3:1")
 
-        if self.last_data_hash == data_hash:
-            return
+        data = np.zeros(len(position), dtype=instance_dtype)
+        data['position'][:] = position
+        data['tex_id'][:] = tex_id
 
         buffer = DisposableBuffer(data)
         self.buffers.insert(0, buffer)
-        self.last_data_hash = data_hash
 
     def render(self) -> None:
         buffer = self.get_latest_buffer()
@@ -83,9 +83,18 @@ class Mesh:
             return
 
         glBindBuffer(GL_ARRAY_BUFFER, buffer.buffer)
+
+        stride = buffer.data.strides[0]
+        offset_pos = buffer.data.dtype.fields['position'][1]
+        offset_tex = buffer.data.dtype.fields['tex_id'][1]
+
         glEnableVertexAttribArray(0)
-        glVertexAttribPointer(0,4,GL_FLOAT,GL_FALSE,0,None)
-        glVertexAttribDivisor(0,1)
+        glVertexAttribPointer(0, 3, GL_FLOAT, False, stride, ctypes.c_void_p(offset_pos))
+        glVertexAttribDivisor(0, 1)
+
+        glEnableVertexAttribArray(1)
+        glVertexAttribPointer(1, 1, GL_FLOAT, False, stride, ctypes.c_void_p(offset_tex))
+        glVertexAttribDivisor(1, 1)
 
         glDrawArraysInstanced(GL_TRIANGLES, 0, 36, len(buffer.data))
 
