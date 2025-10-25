@@ -7,6 +7,7 @@ layout(location = 2) in float tex_id;
 out vec3 v_pos;
 flat out float v_tex_index;
 out vec2 v_uv;
+out float v_fog_distance; // distance from camera
 
 uniform mat4 view;
 uniform mat4 projection;
@@ -16,23 +17,18 @@ vec3 cubeVertex(int idx) {
         // FRONT (+Z)
         vec3(-0.5,-0.5,0.5), vec3(0.5,-0.5,0.5), vec3(0.5, 0.5,0.5),
         vec3(0.5, 0.5,0.5), vec3(-0.5, 0.5,0.5), vec3(-0.5,-0.5,0.5),
-
         // BACK (-Z)
         vec3(0.5,-0.5,-0.5), vec3(-0.5,-0.5,-0.5), vec3(-0.5, 0.5,-0.5),
         vec3(-0.5, 0.5,-0.5), vec3(0.5, 0.5,-0.5), vec3(0.5,-0.5,-0.5),
-
         // LEFT (-X)
         vec3(-0.5,-0.5,-0.5), vec3(-0.5,-0.5, 0.5), vec3(-0.5, 0.5, 0.5),
         vec3(-0.5, 0.5, 0.5), vec3(-0.5, 0.5,-0.5), vec3(-0.5,-0.5,-0.5),
-
         // RIGHT (+X)
         vec3(0.5,-0.5, 0.5), vec3(0.5,-0.5,-0.5), vec3(0.5, 0.5,-0.5),
         vec3(0.5, 0.5,-0.5), vec3(0.5, 0.5, 0.5), vec3(0.5,-0.5, 0.5),
-
         // TOP (+Y)
         vec3(-0.5,0.5, 0.5), vec3(0.5,0.5, 0.5), vec3(0.5,0.5,-0.5),
         vec3(0.5,0.5,-0.5), vec3(-0.5,0.5,-0.5), vec3(-0.5,0.5, 0.5),
-
         // BOTTOM (-Y)
         vec3(-0.5,-0.5,-0.5), vec3(0.5,-0.5,-0.5), vec3(0.5,-0.5, 0.5),
         vec3(0.5,-0.5, 0.5), vec3(-0.5,-0.5, 0.5), vec3(-0.5,-0.5,-0.5)
@@ -45,23 +41,18 @@ vec2 cubeUV(int idx) {
         // FRONT (+Z)
         vec2(0,0), vec2(1,0), vec2(1,1),
         vec2(1,1), vec2(0,1), vec2(0,0),
-
         // BACK (-Z)
         vec2(0,0), vec2(1,0), vec2(1,1),
         vec2(1,1), vec2(0,1), vec2(0,0),
-
         // LEFT (-X)
         vec2(0,0), vec2(1,0), vec2(1,1),
         vec2(1,1), vec2(0,1), vec2(0,0),
-
         // RIGHT (+X)
         vec2(0,0), vec2(1,0), vec2(1,1),
         vec2(1,1), vec2(0,1), vec2(0,0),
-
         // TOP (+Y)
         vec2(0,0), vec2(1,0), vec2(1,1),
         vec2(1,1), vec2(0,1), vec2(0,0),
-
         // BOTTOM (-Y)
         vec2(0,0), vec2(1,0), vec2(1,1),
         vec2(1,1), vec2(0,1), vec2(0,0)
@@ -82,5 +73,8 @@ void main() {
     v_pos = local_pos;
     v_tex_index = tex_id;
     v_uv = cubeUV(idx);
+
+    // fog distance (camera space z)
+    v_fog_distance = length((view * vec4(world_pos, 1.0)).xyz);
 }
 

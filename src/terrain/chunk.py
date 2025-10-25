@@ -5,9 +5,12 @@ import numpy as np
 from typing import TypeAlias
 
 CHUNK_SIDE = 16
-CHUNK_DIMS = tuple(
-    CHUNK_SIDE + 2 for _ in range(3)
-)  # Padding of 2 for neighbouring chunk data
+CHUNK_HEIGHT = 64
+CHUNK_DIMS = tuple([
+    CHUNK_SIDE + 2,
+    CHUNK_HEIGHT + 2,
+    CHUNK_SIDE + 2
+])  # Padding of 2 for neighbouring chunk data
 
 # TODO: Use enums instead of whatever this is
 NOT_GENERATED = 0
@@ -89,59 +92,62 @@ class Chunk:
                 self.terrain[dest_slice] = neighbor.terrain[source]
 
     def generate_terrain(self) -> None:
-        # World coordinates
         x_coords = np.arange(CHUNK_SIDE) + self.position[0] * CHUNK_SIDE
+        y_coords = np.arange(CHUNK_HEIGHT) + self.position[1] * CHUNK_HEIGHT
         z_coords = np.arange(CHUNK_SIDE) + self.position[2] * CHUNK_SIDE
-        y_coords = np.arange(CHUNK_SIDE) + self.position[1] * CHUNK_SIDE
 
-        # Preallocate terrain
-        terrain = np.zeros((CHUNK_SIDE, CHUNK_SIDE, CHUNK_SIDE), dtype=np.uint8)
+        x_grid, z_grid = np.meshgrid(x_coords, z_coords, indexing='ij')
+        heights = np.vectorize(lambda x, z: snoise2(x / 100, z / 100) * 10)(x_grid, z_grid)
+        heights = heights.astype(np.float32)
 
-        # Flatten XZ grid for faster noise computation
-        x_flat, z_flat = np.meshgrid(x_coords, z_coords, indexing='ij')
-        x_flat = x_flat.ravel()
-        z_flat = z_flat.ravel()
-
-        # Compute heights in a single comprehension
-        heights = np.array([snoise2(ix / 100, iz / 100) * 10 for ix, iz in zip(x_flat, z_flat)], dtype=np.float32)
-        heights = heights.reshape(CHUNK_SIDE, CHUNK_SIDE)
-
-        # Broadcast y_coords to compare against heights
-        terrain[:, :, :] = (y_coords[None, :, None] < heights[:, None, :]).astype(np.uint8)
-
+        terrain = (y_coords[None, :, None] < heights[:, None, :]).astype(np.uint8)
         self.terrain[1:-1, 1:-1, 1:-1] = terrain
         self.state = TERRAIN_GENERATED
 
-    def generate_mesh(self, world) -> None:
+    def generate_mesh(self, world) -> bool:
         if not np.any(self.terrain):
             self.state = MESH_GENERATED
-            return
+            return False
 
         self.update_neighbour_terrain(world)
+        terrain = self.terrain
 
-        position = []
-        orientation = []
-        tex_id = []
+        xs, ys, zs = np.nonzero(terrain[1:-1, 1:-1, 1:-1])
+        if xs.size == 0:
+            self.meshdata.position = np.empty((0, 3), dtype=np.float32)
+            self.meshdata.orientation = np.empty(0, dtype=np.uint32)
+            self.meshdata.tex_id = np.empty(0, dtype=np.uint32)
+            self.state = MESH_GENERATED
+            return False
 
-        for x in range(1, CHUNK_SIDE + 1):
-            for y in range(1, CHUNK_SIDE + 1):
-                for z in range(1, CHUNK_SIDE + 1):
-                    if not self.terrain[x, y, z]:
-                        continue
+        xs += 1
+        ys += 1
+        zs += 1
 
-                    wx = self.position[0] * CHUNK_SIDE + (x - 1) - CHUNK_SIDE // 2
-                    wy = self.position[1] * CHUNK_SIDE + (y - 1) - CHUNK_SIDE // 2
-                    wz = self.position[2] * CHUNK_SIDE + (z - 1) - CHUNK_SIDE // 2
+        wx = self.position[0] * CHUNK_SIDE + (xs - 1) - CHUNK_SIDE // 2
+        wy = self.position[1] * CHUNK_HEIGHT + (ys - 1) - CHUNK_HEIGHT // 2
+        wz = self.position[2] * CHUNK_SIDE + (zs - 1) - CHUNK_SIDE // 2
 
-                    for face, (dx, dy, dz) in FACES:
-                        if self.is_air(x + dx, y + dy, z + dz):
-                            position.append((wx, wy, wz))
-                            orientation.append(face)
-                            tex_id.append(randint(0, 3))
+        positions = []
+        orientations = []
+        tex_ids = []
 
-        self.meshdata.position = np.array(position, dtype=np.float32)
-        self.meshdata.orientation = np.array(orientation, dtype=np.uint32)
-        self.meshdata.tex_id = np.array(tex_id, dtype=np.uint32)
+        for face, (dx, dy, dz) in FACES:
+            neighbor_mask = terrain[xs + dx, ys + dy, zs + dz] == 0
+            if np.any(neighbor_mask):
+                positions.append(np.column_stack((wx[neighbor_mask], wy[neighbor_mask], wz[neighbor_mask])))
+                orientations.append(np.full(np.sum(neighbor_mask), face, dtype=np.uint32))
+                tex_ids.append(np.random.randint(0, 4, np.sum(neighbor_mask), dtype=np.uint32))
+
+        if positions:
+            self.meshdata.position = np.vstack(positions).astype(np.float32)
+            self.meshdata.orientation = np.concatenate(orientations)
+            self.meshdata.tex_id = np.concatenate(tex_ids)
+        else:
+            self.meshdata.position = np.empty((0, 3), dtype=np.float32)
+            self.meshdata.orientation = np.empty(0, dtype=np.uint32)
+            self.meshdata.tex_id = np.empty(0, dtype=np.uint32)
 
         self.state = MESH_GENERATED
+        return True
 

@@ -12,7 +12,6 @@ Meet Voxl, a highly optimized infinite procedural voxel terrain generating thing
 ## Roadmap
 - Clean and format up code / style
 - Implement logging
-- Don't render faces that can't be seen (render cube faces independently)
 - Implement multiple block types
 - Actual player movement
 - Destructible terrain

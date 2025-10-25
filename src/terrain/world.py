@@ -7,9 +7,10 @@ import numpy as np
 from core.mesh import Mesh, BufferData
 from core.state import State
 
-from .chunk import CHUNK_SIDE, MESH_GENERATED, Chunk
+from .chunk import CHUNK_HEIGHT, CHUNK_SIDE, MESH_GENERATED, Chunk
 
-RENDER_DIST = 12
+RENDER_DIST = 8
+RENDER_HEIGHT = 3
 BATCH_SIZE = multiprocessing.cpu_count()
 
 
@@ -76,9 +77,11 @@ class ChunkStorage:
             self.ensure_chunk(position)
 
         self.chunks[position].generate_terrain()
-        self.chunks[position].generate_mesh(self)
+        notify = self.chunks[position].generate_mesh(self)
 
-        self.notify_neighbours(position)
+        if notify:
+            self.notify_neighbours(position)
+
         self.changed = True
 
     def rebuild_chunk(self, position) -> None:
@@ -127,7 +130,7 @@ class ChunkStorage:
 
         required_chunks = set()
         for x in range(-RENDER_DIST, RENDER_DIST + 1):
-            for y in range(-RENDER_DIST, RENDER_DIST + 1):
+            for y in range(-RENDER_HEIGHT, RENDER_HEIGHT + 1):
                 for z in range(-RENDER_DIST, RENDER_DIST + 1):
                     translated_x = x + camera_chunk[0]
                     translated_y = y + camera_chunk[1]
@@ -221,8 +224,10 @@ class World:
 
     def update(self) -> None:
         player_position = self.state.camera.position
-        camera_chunk = tuple(
-            (int(player_position[i] // CHUNK_SIDE) for i in range(3))
+        camera_chunk = (
+            player_position[0] // CHUNK_SIDE,
+            player_position[1] // CHUNK_HEIGHT,
+            player_position[2] // CHUNK_SIDE
         )
         self.handler.set_camera_chunk(camera_chunk)
 
