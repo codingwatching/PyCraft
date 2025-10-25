@@ -101,9 +101,9 @@ class Chunk:
                     if self.terrain[i][j][k]:
                         tex_id.append(randint(0,2))
                         position.append([
-                            self.position[0] * CHUNK_SIDE + x,
-                            self.position[1] * CHUNK_SIDE + y,
-                            self.position[2] * CHUNK_SIDE + z,
+                            self.position[0] * CHUNK_SIDE + x - CHUNK_SIDE // 2,
+                            self.position[1] * CHUNK_SIDE + y - CHUNK_SIDE // 2,
+                            self.position[2] * CHUNK_SIDE + z - CHUNK_SIDE // 2,
                         ])
 
         self.meshdata.position = position

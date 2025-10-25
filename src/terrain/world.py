@@ -122,9 +122,9 @@ class ChunkStorage:
         self.camera_chunk = camera_chunk
 
         required_chunks = set()
-        for x in range(-RENDER_DIST, RENDER_DIST):
-            for y in range(-RENDER_DIST, RENDER_DIST):
-                for z in range(-RENDER_DIST, RENDER_DIST):
+        for x in range(-RENDER_DIST, RENDER_DIST + 1):
+            for y in range(-RENDER_DIST, RENDER_DIST + 1):
+                for z in range(-RENDER_DIST, RENDER_DIST + 1):
                     translated_x = x + camera_chunk[0]
                     translated_y = y + camera_chunk[1]
                     translated_z = z + camera_chunk[2]
