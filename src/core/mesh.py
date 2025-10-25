@@ -70,6 +70,9 @@ class Mesh:
         if len(position) != len(tex_id):
             raise RuntimeError("position and tex_id buffer lengths don't match 3:1")
 
+        if len(position) == 0:
+            return
+
         data = np.zeros(len(position), dtype=instance_dtype)
         data['position'][:] = position
         data['tex_id'][:] = tex_id
