@@ -2,7 +2,7 @@ import logging
 import logging.config
 from pathlib import Path
 
-LOG_DIR = Path(__file__).parent / "log"
+LOG_DIR = Path(__file__).parent / "logs"
 LOG_DIR.mkdir(exist_ok=True)
 
 def setup_logging(level: int = logging.INFO):

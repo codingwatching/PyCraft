@@ -133,11 +133,8 @@ dmypy.json
 # executables
 *.exe
 
-# Atlases
-atlas.png
-
-# PyCraft cache
-cache/
+# PyCraft logs
+src/logs
 
 # Pickle files
 *.pickle
