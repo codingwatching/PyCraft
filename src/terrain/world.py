@@ -7,7 +7,7 @@ if TYPE_CHECKING:
 from core.mesh import Mesh
 from type_hints import Position
 from .chunk_handler import ChunkHandler
-from constants import CHUNK_HEIGHT, CHUNK_SIDE
+from constants import CHUNK_SIDE
 
 class World:
     def __init__(self, state: State) -> None:
@@ -26,7 +26,7 @@ class World:
             player_position: list[float] = self.state.camera.position
             camera_chunk = (
                 int(player_position[0] // CHUNK_SIDE),
-                int(player_position[1] // CHUNK_HEIGHT),
+                int(player_position[1] // CHUNK_SIDE),
                 int(player_position[2] // CHUNK_SIDE)
             )
         self.handler.set_camera_chunk(camera_chunk)

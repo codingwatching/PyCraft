@@ -1,15 +1,14 @@
 from __future__ import annotations
 
 from math import dist
-import threading
 from noise import snoise2
 import numpy as np
 from typing import TypeAlias
 from functools import lru_cache
 
 from type_hints import Position
-from constants import NOT_GENERATED, CHUNK_DIMS, CHUNK_SIDE, CHUNK_HEIGHT, MESH_GENERATED, TERRAIN_GENERATED, FACES
-from constants import RENDER_DIST, RENDER_HEIGHT, BATCH_SIZE
+from constants import NOT_GENERATED, CHUNK_DIMS, CHUNK_SIDE, MESH_GENERATED, TERRAIN_GENERATED, FACES
+from constants import RENDER_DIST, BATCH_SIZE
 
 @lru_cache()
 def fractal_noise(x: float, z: float) -> float:
@@ -78,7 +77,7 @@ class Chunk:
     def generate_terrain(self) -> None:
         # left here
         x_coords = np.arange(CHUNK_SIDE) + self.position[0] * CHUNK_SIDE
-        y_coords = np.arange(CHUNK_HEIGHT) + self.position[1] * CHUNK_HEIGHT
+        y_coords = np.arange(CHUNK_SIDE) + self.position[1] * CHUNK_SIDE
         z_coords = np.arange(CHUNK_SIDE) + self.position[2] * CHUNK_SIDE
 
         x_grid, z_grid = np.meshgrid(x_coords, z_coords, indexing='ij')
@@ -110,7 +109,7 @@ class Chunk:
         zs += 1
 
         wx = self.position[0] * CHUNK_SIDE + (xs - 1) - CHUNK_SIDE // 2
-        wy = self.position[1] * CHUNK_HEIGHT + (ys - 1) - CHUNK_HEIGHT // 2
+        wy = self.position[1] * CHUNK_SIDE + (ys - 1) - CHUNK_SIDE // 2
         wz = self.position[2] * CHUNK_SIDE + (zs - 1) - CHUNK_SIDE // 2
 
         positions = []
@@ -212,8 +211,9 @@ class ChunkStorage:
 
         if notify:
             self.notify_neighbours(position)
+            self.changed = True
 
-        self.changed = True
+        return notify
 
     def rebuild_chunk(self, position: Position) -> None:
         if position not in self.chunks:
@@ -262,7 +262,7 @@ class ChunkStorage:
 
         required_chunks: set[Position] = set()
         for x in range(-RENDER_DIST, RENDER_DIST + 1):
-            for y in range(-RENDER_HEIGHT, RENDER_HEIGHT + 1):
+            for y in range(-RENDER_DIST, RENDER_DIST + 1):
                 for z in range(-RENDER_DIST, RENDER_DIST + 1):
                     translated_x = x + camera_chunk[0]
                     translated_y = y + camera_chunk[1]
@@ -293,26 +293,12 @@ class ChunkStorage:
         self.rebuild_queue = self.sort_by_distance(self.rebuild_queue)
 
         count = 0
-        threads: list[threading.Thread] = []
         while len(self.build_queue) > 0 and count < BATCH_SIZE:
             position = self.build_queue.pop(0)
-            threads.append(threading.Thread(
-                target = self.build_chunk, 
-                args = [position], 
-                daemon = True
-            ))
-            threads[-1].start()
-            count += 1
+            if self.build_chunk(position):
+                count += 1
 
         while len(self.rebuild_queue) > 0:
             position = self.rebuild_queue.pop(0)
-            threads.append(threading.Thread(
-                target = self.rebuild_chunk,
-                args = [position],
-                daemon = True
-            ))
-            threads[-1].start()
-
-        for thread in threads:
-            thread.join()
+            self.rebuild_chunk(position)
 

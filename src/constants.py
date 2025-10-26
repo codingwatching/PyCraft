@@ -1,13 +1,9 @@
-RENDER_DIST = 5
-RENDER_HEIGHT = 3
+RENDER_DIST = 6
 BATCH_SIZE = 64
 
 CHUNK_SIDE = 16
-CHUNK_HEIGHT = 64
 CHUNK_DIMS = tuple([
-    CHUNK_SIDE + 2,
-    CHUNK_HEIGHT + 2,
-    CHUNK_SIDE + 2
+    CHUNK_SIDE + 2 for _ in range(3)
 ])  # Padding of 2 for neighbouring chunk data
 
 # TODO: Use enums instead of whatever this is
