@@ -121,7 +121,7 @@ class Chunk:
             if np.any(neighbor_mask):
                 positions.append(np.column_stack((wx[neighbor_mask], wy[neighbor_mask], wz[neighbor_mask])))
                 orientations.append(np.full(np.sum(neighbor_mask), face, dtype=np.uint32))
-                tex_ids.append(np.random.randint(0, 4, np.sum(neighbor_mask), dtype=np.uint32))
+                tex_ids.append(np.random.randint(0, 2, np.sum(neighbor_mask), dtype=np.uint32))
 
         if positions:
             self.meshdata.position = np.vstack(positions).astype(np.float32)

@@ -1,5 +1,7 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
+import logging
+logger = logging.getLogger(__name__) 
 
 import ctypes
 from typing import TypeAlias
@@ -41,7 +43,11 @@ class DisposableBuffer:
         self.buffer: np.uint32 = glGenBuffers(1)
         self.ready: bool = False
 
+        logger.debug(f"Created DisposableBuffer with id {self.buffer}")
+
     def send_to_gpu(self) -> None:
+        logger.debug(f"Sending to GPU: DisposableBuffer with id {self.buffer}")
+
         glBindBuffer(GL_ARRAY_BUFFER, self.buffer)
         glBufferData(GL_ARRAY_BUFFER, self.data.nbytes, None, GL_STATIC_DRAW)
         glBufferSubData(GL_ARRAY_BUFFER, 0, self.data.nbytes, self.data)
@@ -84,6 +90,7 @@ class Mesh:
         data['orientation'][:] = orientation
         data['tex_id'][:] = tex_id
 
+        logger.debug(f"Updating mesh data (length {len(data)})")
         buffer = DisposableBuffer(data)
         self.buffers.insert(0, buffer)
 
@@ -155,7 +162,10 @@ class MeshHandler:
             )
         self.state.mesh_handler = self
 
+        logger.info("MeshHandler instantiated successfully.")
+
     def new_mesh(self, id: str) -> Mesh:
+        logger.info(f"Created new mesh with id {id}")
         buffer = Mesh(self.state)
         self.meshes[id] = buffer
         return buffer
@@ -163,7 +173,8 @@ class MeshHandler:
     def get_mesh(self, id: str) -> Mesh:
         return self.meshes[id]
 
-    def remove_buffer(self, id: str) -> None:
+    def remove_mesh(self, id: str) -> None:
+        logger.info(f"Removed mesh with id {id}")
         del self.meshes[id]
 
     def drawcall(self) -> None:
@@ -183,6 +194,7 @@ class MeshHandler:
             pass
 
     def on_close(self) -> None:
+        logger.info("Cleaning up buffers...")
         try:
             for mesh in self.meshes:
                 self.meshes[mesh].on_close()
