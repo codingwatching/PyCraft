@@ -1,44 +1,16 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from .world import World, Position
-
+from math import dist
+import threading
 from noise import snoise2
 import numpy as np
 from typing import TypeAlias
 from functools import lru_cache
 
-CHUNK_SIDE = 16
-CHUNK_HEIGHT = 64
-CHUNK_DIMS = tuple([
-    CHUNK_SIDE + 2,
-    CHUNK_HEIGHT + 2,
-    CHUNK_SIDE + 2
-])  # Padding of 2 for neighbouring chunk data
+from type_hints import Position
+from constants import NOT_GENERATED, CHUNK_DIMS, CHUNK_SIDE, CHUNK_HEIGHT, MESH_GENERATED, TERRAIN_GENERATED, FACES
+from constants import RENDER_DIST, RENDER_HEIGHT, BATCH_SIZE
 
-# TODO: Use enums instead of whatever this is
-NOT_GENERATED = 0
-TERRAIN_GENERATED = 1
-MESH_GENERATED = 2
-
-FRONT  = 0
-BACK   = 1
-LEFT   = 2
-RIGHT  = 3
-TOP    = 4
-BOTTOM = 5
-
-FACES = [
-    (FRONT,  (0,  0,  1)),
-    (BACK,   (0,  0, -1)),
-    (LEFT,  (-1,  0,  0)),
-    (RIGHT,  (1,  0,  0)),
-    (TOP,    (0,  1,  0)),
-    (BOTTOM, (0, -1,  0)),
-]
-
-# noise fn
 @lru_cache()
 def fractal_noise(x: float, z: float) -> float:
     return (
@@ -67,7 +39,7 @@ class Chunk:
     def id_string(self) -> str:
         return f"chunk_{self.position[0]}_{self.position[1]}_{self.position[2]}"
 
-    def update_neighbour_terrain(self, world: World) -> None:
+    def update_neighbour_terrain(self, storage: ChunkStorage) -> None:
         neighbour_dirs: dict[Position, tuple[slice, slice, slice]] = {
             (1, 0, 0): (slice(-1, None), slice(1, -1), slice(1, -1)),
             (-1, 0, 0): (slice(0, 1), slice(1, -1), slice(1, -1)),
@@ -85,8 +57,8 @@ class Chunk:
                 self.position[1] + dy,
                 self.position[2] + dz,
             )
-            if world.chunk_exists(neighbor_pos):
-                neighbor = world.chunks[neighbor_pos]
+            if storage.chunk_exists(neighbor_pos):
+                neighbor = storage.chunks[neighbor_pos]
 
                 if dx == 1:
                     source = (slice(1, 2),) + center[1:]
@@ -117,12 +89,12 @@ class Chunk:
         self.terrain[1:-1, 1:-1, 1:-1] = terrain
         self.state = TERRAIN_GENERATED
 
-    def generate_mesh(self, world) -> bool:
+    def generate_mesh(self, storage: ChunkStorage) -> bool:
         if not np.any(self.terrain):
             self.state = MESH_GENERATED
             return False
 
-        self.update_neighbour_terrain(world)
+        self.update_neighbour_terrain(storage)
         terrain = self.terrain
 
         xs, ys, zs = np.nonzero(terrain[1:-1, 1:-1, 1:-1])
@@ -163,4 +135,184 @@ class Chunk:
 
         self.state = MESH_GENERATED
         return True
+
+class ChunkStorage:
+    chunks: dict[Position, Chunk]
+    cache: dict[Position, Chunk]
+    build_queue: list[Position]
+    rebuild_queue: list[Position]
+    camera_chunk: Position | None
+    changed: bool
+
+    def __init__(self) -> None:
+        self.chunks = {}
+        self.cache = {}
+        self.build_queue = []
+        self.rebuild_queue = []
+        self.camera_chunk = None
+        self.changed = False
+
+    def ensure_chunk(self, position: Position):
+        if position in self.chunks:
+            return
+        if position in self.cache:
+            self.uncache_chunk(position)
+            return
+
+        chunk = Chunk(position)
+        self.chunks[position] = chunk
+        self.build_queue.append(position)
+
+    def cache_chunk(self, position: Position):
+        self.cache[position] = self.chunks[position]
+        del self.chunks[position]
+
+    def uncache_chunk(self, position: Position):
+        self.chunks[position] = self.cache[position]
+        del self.cache[position]
+
+    def chunk_exists(self, position: Position) -> bool:
+        return position in self.chunks
+
+    def get_neighbours(self, position: Position) -> list[Chunk]:
+        x, y, z = position
+        directions = [
+            (1, 0, 0),
+            (-1, 0, 0),
+            (0, 1, 0),
+            (0, -1, 0),
+            (0, 0, 1),
+            (0, 0, -1),
+        ]
+
+        neighbours: list[Chunk] = []
+        for dx, dy, dz in directions:
+            neighbour_id = (x + dx, y + dy, z + dz)
+            if neighbour_id in self.chunks:
+                neighbours.append(self.chunks[neighbour_id])
+
+        return neighbours
+
+    def notify_neighbours(self, position: Position) -> None:
+        neighbours = self.get_neighbours(position)
+        for chunk in neighbours:
+            self.rebuild_queue.append(chunk.position)
+
+    def sort_by_distance(self, positions: list[Position]) -> list[Position]:
+        if self.camera_chunk is None:
+            return positions
+        return sorted(positions, key=lambda x: dist(x, self.camera_chunk))
+
+    def build_chunk(self, position: Position):
+        if position not in self.chunks:
+            self.ensure_chunk(position)
+
+        self.chunks[position].generate_terrain()
+        notify = self.chunks[position].generate_mesh(self)
+
+        if notify:
+            self.notify_neighbours(position)
+
+        self.changed = True
+
+    def rebuild_chunk(self, position: Position) -> None:
+        if position not in self.chunks:
+            self.ensure_chunk(position)
+        chunk = None
+
+        if position in self.chunks:
+            chunk = self.chunks[position]
+        elif position in self.cache:
+            chunk = self.cache[position]
+
+        if chunk is None:
+            return
+
+        chunk.generate_mesh(self)
+        self.changed = True
+
+    def generate_mesh_data(self) -> tuple | None:
+        position: list[list[float]] = []
+        orientation: list[int] = []
+        tex_id: list[float] = []
+
+        for id in list(self.chunks.keys()):
+            chunk = self.chunks[id]
+
+            if chunk.state != MESH_GENERATED:
+                continue
+
+            data = chunk.meshdata
+            position.extend(data.position)
+            orientation.extend(data.orientation)
+            tex_id.extend(data.tex_id)
+
+        try:
+            return (
+                np.array(position, dtype = np.float32),
+                np.array(orientation, dtype = np.float32),
+                np.array(tex_id, dtype = np.float32)
+            )
+        except ValueError:
+            return None
+
+    def update(self, camera_chunk: Position):
+        self.changed = False
+        self.camera_chunk = camera_chunk
+
+        required_chunks: set[Position] = set()
+        for x in range(-RENDER_DIST, RENDER_DIST + 1):
+            for y in range(-RENDER_HEIGHT, RENDER_HEIGHT + 1):
+                for z in range(-RENDER_DIST, RENDER_DIST + 1):
+                    translated_x = x + camera_chunk[0]
+                    translated_y = y + camera_chunk[1]
+                    translated_z = z + camera_chunk[2]
+                    required_chunks.add((
+                        translated_x, 
+                        translated_y, 
+                        translated_z
+                    ))
+
+        for required in required_chunks:
+            self.ensure_chunk(required)
+
+        to_delete: set[Position] = set(self.chunks.keys()) - required_chunks
+        for position in to_delete:
+            self.cache_chunk(position)
+
+        to_delete = set()
+        for position in self.cache:
+            distance = dist(position, camera_chunk)
+            if distance > RENDER_DIST * 4:
+                to_delete.add(position)
+
+        for position in to_delete:
+            del self.cache[position]
+            
+        self.build_queue = self.sort_by_distance(self.build_queue)
+        self.rebuild_queue = self.sort_by_distance(self.rebuild_queue)
+
+        count = 0
+        threads: list[threading.Thread] = []
+        while len(self.build_queue) > 0 and count < BATCH_SIZE:
+            position = self.build_queue.pop(0)
+            threads.append(threading.Thread(
+                target = self.build_chunk, 
+                args = [position], 
+                daemon = True
+            ))
+            threads[-1].start()
+            count += 1
+
+        while len(self.rebuild_queue) > 0:
+            position = self.rebuild_queue.pop(0)
+            threads.append(threading.Thread(
+                target = self.rebuild_chunk,
+                args = [position],
+                daemon = True
+            ))
+            threads[-1].start()
+
+        for thread in threads:
+            thread.join()
 

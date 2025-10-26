@@ -1,9 +1,13 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
 try:
     from pyglm import glm
 except ImportError:
     import glm
 
-from .state import State
+if TYPE_CHECKING:
+    from .window import State
 
 
 class Camera:
@@ -19,7 +23,7 @@ class Camera:
 
         self.state.camera = self
 
-    def get_matrix(self):
+    def get_matrix(self) -> tuple[glm.mat4, glm.mat4]:
         matrix = glm.mat4(1.0)
         for i in range(3):
             thing = glm.vec3(0.0)
@@ -29,7 +33,7 @@ class Camera:
         position = [-i for i in self.position]
         matrix = glm.translate(matrix, glm.vec3(position))
 
-        size = self.state.window.size
+        size: tuple[int, int] = self.state.window.size
         width: int = size[0]
         height: int = size[1]
         self.aspect = 1

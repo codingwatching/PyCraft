@@ -1,10 +1,44 @@
+from __future__ import annotations
+from typing import Any
+from time import perf_counter_ns
+
 import glfw
 from OpenGL.GL import GL_TRUE, glEnable, GL_MULTISAMPLE, glViewport
 
 from terrain.world import World
-
 from .renderer import Renderer
-from .state import State
+from .asset_manager import AssetManager
+from .mesh import MeshHandler
+from .camera import Camera
+from player import Player
+
+class State:
+    def __init__(self, window: Window) -> None:
+        self.frame: int = 0
+        self.window: Window = window
+        self.alive: bool = True
+        self.shared_context_alive: bool = False
+        self.asset_manager: AssetManager | None = None
+        self.mesh_handler: MeshHandler | None = None
+        self.camera: Camera | None = None
+        self.player: Player | None = None
+        self.world: World | None = None
+
+        self.last_frame_time: int = perf_counter_ns()
+        self.fps: float = 0.0
+        self.dt: float = 0.0
+
+    def on_drawcall(self) -> None:
+        now: int = perf_counter_ns()
+        self.dt = (now - self.last_frame_time) / 1_000_000_000
+        self.last_frame_time = now
+
+        self.fps = 1 / self.dt
+
+        self.frame += 1
+
+    def on_close(self) -> None:
+        self.alive = False
 
 
 class Window:
@@ -22,7 +56,7 @@ class Window:
 
         glEnable(GL_MULTISAMPLE)
 
-        self.window = glfw.create_window(640, 480, "Voxl", None, None)
+        self.window: Any = glfw.create_window(640, 480, "Voxl", None, None)
         if not self.window:
             glfw.terminate()
             raise Exception(
@@ -40,7 +74,8 @@ class Window:
             width, height = self.size
             glViewport(0, 0, width, height)
 
-            self.state.player.drawcall()
+            if self.state.player is not None:
+                self.state.player.drawcall()
             self.renderer.drawcall()
             self.state.on_drawcall()
 

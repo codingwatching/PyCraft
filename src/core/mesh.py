@@ -1,3 +1,6 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
 import ctypes
 from typing import TypeAlias
 
@@ -21,7 +24,8 @@ from OpenGL.GL import (
     glVertexAttribDivisor,
 )
 
-from .state import State
+if TYPE_CHECKING:
+    from .window import State
 
 BufferData: TypeAlias = np.typing.NDArray[np.float32]
 instance_dtype = np.dtype([

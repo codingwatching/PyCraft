@@ -1,9 +1,11 @@
-import math
+from __future__ import annotations
+from typing import TYPE_CHECKING
 
+import math
 import glfw
 
-from core.state import State
-
+if TYPE_CHECKING:
+    from core.window import State
 
 # TODO: Clean up this ancient mess
 class Player:

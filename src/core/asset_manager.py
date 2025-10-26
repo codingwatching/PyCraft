@@ -1,3 +1,6 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
 import os
 from typing import Any
 
@@ -27,20 +30,19 @@ from OpenGL.GL import (
 from OpenGL.GL.shaders import compileProgram, compileShader, ShaderProgram
 from PIL import Image
 
-from .state import State
+if TYPE_CHECKING:
+    from .window import State
 
 ASSET_DIR = "./assets/"
 
 
 class AssetManager:
-    texture: int
-
     def __init__(self, state: State) -> None:
         self.state: State = state
         self.state.asset_manager = self
 
         self.shaders: dict[str, ShaderProgram] = {}
-        self.texture = 0
+        self.texture: int = 0
 
     def load_assets(self, asset_dir: str = ASSET_DIR, name_prefix: str = "") -> None:
         shader_dir = os.path.join(asset_dir, "shaders/")

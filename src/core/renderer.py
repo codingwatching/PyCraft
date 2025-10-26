@@ -1,3 +1,6 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
 import numpy as np
 from OpenGL.GL import (
     GL_BACK,
@@ -31,7 +34,9 @@ from .asset_manager import AssetManager
 from .camera import Camera
 from .mesh import MeshHandler
 from .shared_context import SharedContext
-from .state import State
+
+if TYPE_CHECKING:
+    from .window import State
 
 BACKGROUND = (0.5, 0.69, 1.0)
 

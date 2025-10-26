@@ -1,18 +1,17 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING, Any
+
 import threading
-from typing import Any
-from .state import State
+
+if TYPE_CHECKING:
+    from .window import State, Window
 
 import glfw
-
 
 class SharedContext:
     def __init__(self, state: State) -> None:
         self.state: State = state
-        if state.window is None:
-            raise Exception(
-                "[core.shared_context.SharedContext] Could not retrieve window from state"
-            )
-        self.parent = state.window
+        self.parent: Window = state.window
         self.thread: threading.Thread | None = None
         self.window: Any | None = None
 
@@ -31,10 +30,6 @@ class SharedContext:
         self.window = glfw.create_window(
             1, 1, "Shared Context", None, self.parent.window
         )
-        if self.window is None:
-            raise Exception(
-                "[core.shared_context.SharedContext] Failed to initialize GLFW window"
-            )
         self.state.shared_context_alive = True
 
         glfw.make_context_current(self.window)
@@ -57,6 +52,10 @@ class SharedContext:
         if self.state.mesh_handler:
             self.state.mesh_handler.update()
 
-        glfw.swap_buffers(self.window)
+        if self.window is not None:
+            glfw.swap_buffers(self.window)
+        else:
+            raise RuntimeError("[core.shared_context.SharedContext] tried to call self.step() but self.window is None")
+
         glfw.poll_events()
 
