@@ -46,9 +46,9 @@ class Player:
             self.state_map["velocity"][0] += dz * sens
             self.state_map["velocity"][2] += dx * sens
         if glfw.get_key(self.state.window.window, glfw.KEY_LEFT_CONTROL) == glfw.PRESS:
-            self.state_map["speed"] = 0.03
-        else:
             self.state_map["speed"] = 0.02
+        else:
+            self.state_map["speed"] = 0.015
 
         if glfw.get_key(self.state.window.window, glfw.KEY_ESCAPE) == glfw.PRESS:
             glfw.set_input_mode(

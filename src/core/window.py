@@ -1,6 +1,8 @@
 from __future__ import annotations
 from typing import Any
 from time import perf_counter_ns
+import logging
+logger = logging.getLogger(__name__) 
 
 import glfw
 from OpenGL.GL import GL_TRUE, glEnable, GL_MULTISAMPLE, glViewport
@@ -45,7 +47,7 @@ class Window:
     def __init__(self) -> None:
         if not glfw.init():
             raise Exception(
-                "[core.window.Window] Init failed: Could not initialize glfw"
+                "Init failed: Could not initialize glfw"
             )
 
         glfw.window_hint(glfw.SAMPLES, 1)
@@ -56,11 +58,12 @@ class Window:
 
         glEnable(GL_MULTISAMPLE)
 
+        logger.info("Creating main window")
         self.window: Any = glfw.create_window(640, 480, "Voxl", None, None)
         if not self.window:
             glfw.terminate()
             raise Exception(
-                "[core.window.Window] Init failed: Could not create glfw window"
+                "Init failed: Could not create glfw window"
             )
         glfw.make_context_current(self.window)
         glfw.swap_interval(0) # vsync
@@ -69,7 +72,11 @@ class Window:
         self.renderer: Renderer = Renderer(self.state)
         self.world: World = World(self.state)
 
+        logger.info("Window instantiated.")
+
     def mainloop(self) -> None:
+        logger.info("Begin mainloop")
+
         while not glfw.window_should_close(self.window):
             width, height = self.size
             glViewport(0, 0, width, height)
@@ -82,6 +89,7 @@ class Window:
             glfw.swap_buffers(self.window)
             glfw.poll_events()
 
+        logger.info("Terminated!")
         self.state.on_close()
         while self.state.shared_context_alive:
             pass

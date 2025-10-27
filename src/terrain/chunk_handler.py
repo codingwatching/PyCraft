@@ -1,3 +1,6 @@
+import logging
+logger = logging.getLogger(__name__) 
+
 from time import sleep
 import multiprocessing
 from multiprocessing.managers import SyncManager, NamespaceProxy
@@ -18,14 +21,19 @@ class ChunkHandler:
         self.namespace.camera_chunk = (0, 0, 0)
         self.namespace.alive = True
 
+        logger.info("Starting worker")
+
         self.process = multiprocessing.Process(
             target=self.worker, args=(self.namespace,)
         )
         self.process.start()
 
+        logger.info("ChunkHandler instantiated.")
+
     def worker(self, namespace: NamespaceProxy) -> None:
         storage = ChunkStorage()
 
+        logger.info("Worker: starting mainloop")
         while self.namespace.alive:
             storage.update(namespace.camera_chunk)
 
@@ -49,6 +57,8 @@ class ChunkHandler:
         self.namespace.camera_chunk = position
 
     def kill(self) -> None:
+        logger.info("Terminating worker")
+
         self.namespace.alive = False
         self.process.terminate()
 

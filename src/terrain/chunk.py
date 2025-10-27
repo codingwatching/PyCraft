@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import logging
+logger = logging.getLogger(__name__) 
+
 from math import dist
 from noise import snoise2
 import numpy as np
@@ -26,6 +29,11 @@ class ChunkMeshData:
         self.orientation: list[int] = []
         self.tex_id: list[float] = []
 
+    def clear(self):
+        self.position = []
+        self.orientation = []
+        self.tex_id = []
+
 class Chunk:
     def __init__(self, position: PositionType):
         self.position: PositionType = position
@@ -34,11 +42,15 @@ class Chunk:
         self.terrain: np.typing.NDArray[np.uint8] = np.zeros(CHUNK_DIMS, dtype=np.uint8)
         self.meshdata: ChunkMeshData = ChunkMeshData()
 
+        logger.debug(f"New chunk created: {self.id_string}")
+
     @property
     def id_string(self) -> str:
         return f"chunk_{self.position[0]}_{self.position[1]}_{self.position[2]}"
 
     def update_neighbour_terrain(self, storage: ChunkStorage) -> None:
+        logger.debug(f"Chunk {self.id_string} updating neighbour terrain")
+
         neighbour_dirs: dict[Position, tuple[slice, slice, slice]] = {
             (1, 0, 0): (slice(-1, None), slice(1, -1), slice(1, -1)),
             (-1, 0, 0): (slice(0, 1), slice(1, -1), slice(1, -1)),
@@ -75,7 +87,8 @@ class Chunk:
                 self.terrain[dest_slice] = neighbor.terrain[source]
 
     def generate_terrain(self) -> None:
-        # left here
+        logger.debug(f"Chunk {self.id_string} Generating terrain")
+
         x_coords = np.arange(CHUNK_SIDE) + self.position[0] * CHUNK_SIDE
         y_coords = np.arange(CHUNK_SIDE) + self.position[1] * CHUNK_SIDE
         z_coords = np.arange(CHUNK_SIDE) + self.position[2] * CHUNK_SIDE
@@ -89,8 +102,14 @@ class Chunk:
         self.state = TERRAIN_GENERATED
 
     def generate_mesh(self, storage: ChunkStorage) -> bool:
+        logger.debug(f"Chunk {self.id_string} Generating mesh")
+
         if not np.any(self.terrain):
+            self.meshdata.clear()
             self.state = MESH_GENERATED
+
+            logger.debug(f"Chunk {self.id_string} mesh empty!")
+
             return False
 
         self.update_neighbour_terrain(storage)
@@ -98,10 +117,11 @@ class Chunk:
 
         xs, ys, zs = np.nonzero(terrain[1:-1, 1:-1, 1:-1])
         if xs.size == 0:
-            self.meshdata.position = np.empty((0, 3), dtype=np.float32)
-            self.meshdata.orientation = np.empty(0, dtype=np.uint32)
-            self.meshdata.tex_id = np.empty(0, dtype=np.uint32)
+            self.meshdata.clear()
             self.state = MESH_GENERATED
+
+            logger.debug(f"Chunk {self.id_string} mesh empty!")
+
             return False
 
         xs += 1
@@ -119,18 +139,19 @@ class Chunk:
         for face, (dx, dy, dz) in FACES:
             neighbor_mask = terrain[xs + dx, ys + dy, zs + dz] == 0
             if np.any(neighbor_mask):
-                positions.append(np.column_stack((wx[neighbor_mask], wy[neighbor_mask], wz[neighbor_mask])))
-                orientations.append(np.full(np.sum(neighbor_mask), face, dtype=np.uint32))
-                tex_ids.append(np.random.randint(0, 2, np.sum(neighbor_mask), dtype=np.uint32))
+                positions.extend(np.column_stack((wx[neighbor_mask], wy[neighbor_mask], wz[neighbor_mask])).tolist())
+                orientations.extend(np.full(np.sum(neighbor_mask), face, dtype=np.uint32).tolist())
+                tex_ids.extend(np.random.randint(0, 2, np.sum(neighbor_mask), dtype=np.uint32).tolist())
 
         if positions:
-            self.meshdata.position = np.vstack(positions).astype(np.float32)
-            self.meshdata.orientation = np.concatenate(orientations)
-            self.meshdata.tex_id = np.concatenate(tex_ids)
+            self.meshdata.position = positions
+            self.meshdata.orientation = orientations
+            self.meshdata.tex_id = tex_ids
+
+            logger.debug(f"Chunk {self.id_string} mesh generated.")
         else:
-            self.meshdata.position = np.empty((0, 3), dtype=np.float32)
-            self.meshdata.orientation = np.empty(0, dtype=np.uint32)
-            self.meshdata.tex_id = np.empty(0, dtype=np.uint32)
+            self.meshdata.clear()
+            logger.debug(f"Chunk {self.id_string} mesh empty!")
 
         self.state = MESH_GENERATED
         return True
@@ -158,15 +179,21 @@ class ChunkStorage:
             self.uncache_chunk(position)
             return
 
+        logger.debug(f"Ensuring chunk at {position}")
+
         chunk = Chunk(position)
         self.chunks[position] = chunk
         self.build_queue.append(position)
 
     def cache_chunk(self, position: Position):
+        logger.debug(f"Caching chunk at {position}")
+
         self.cache[position] = self.chunks[position]
         del self.chunks[position]
 
     def uncache_chunk(self, position: Position):
+        logger.debug(f"Uncaching chunk at {position}")
+
         self.chunks[position] = self.cache[position]
         del self.cache[position]
 
@@ -193,6 +220,8 @@ class ChunkStorage:
         return neighbours
 
     def notify_neighbours(self, position: Position) -> None:
+        logger.debug(f"Notifying neighbours of {position}")
+
         neighbours = self.get_neighbours(position)
         for chunk in neighbours:
             self.rebuild_queue.append(chunk.position)
@@ -203,19 +232,22 @@ class ChunkStorage:
         return sorted(positions, key=lambda x: dist(x, self.camera_chunk))
 
     def build_chunk(self, position: Position):
+        logger.debug(f"Building chunk {position}")
+
         if position not in self.chunks:
             self.ensure_chunk(position)
 
         self.chunks[position].generate_terrain()
-        notify = self.chunks[position].generate_mesh(self)
+        self.notify_neighbours(position)
 
-        if notify:
-            self.notify_neighbours(position)
-            self.changed = True
+        counts = self.chunks[position].generate_mesh(self)
+        self.changed = counts
 
-        return notify
+        return counts
 
     def rebuild_chunk(self, position: Position) -> None:
+        logger.debug(f"Rebuilding chunk {position}")
+
         if position not in self.chunks:
             self.ensure_chunk(position)
         chunk = None
@@ -232,6 +264,8 @@ class ChunkStorage:
         self.changed = True
 
     def generate_mesh_data(self) -> tuple | None:
+        logger.debug(f"Generating unified mesh data")
+
         position: list[list[float]] = []
         orientation: list[int] = []
         tex_id: list[float] = []
@@ -287,6 +321,7 @@ class ChunkStorage:
                 to_delete.add(position)
 
         for position in to_delete:
+            logger.debug(f"Deleting chunk {position}")
             del self.cache[position]
             
         self.build_queue = self.sort_by_distance(self.build_queue)

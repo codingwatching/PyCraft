@@ -10,7 +10,6 @@ Meet Voxl, a highly optimized infinite procedural voxel terrain generating thing
 - Simplex noise-based terrain generation (very wip)
 
 ## Roadmap
-- Logging
 - Multiple block types
 - Implement moddability early-on. Even the base game data is a "mod". Kind of like KSP. Just put a mod in the mod folder and you're done!
 - Greedy meshing

@@ -1,5 +1,7 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any
+import logging
+logger = logging.getLogger(__name__) 
 
 import threading
 
@@ -15,10 +17,13 @@ class SharedContext:
         self.thread: threading.Thread | None = None
         self.window: Any | None = None
 
+        logger.info("SharedContext instantiated.")
+
     def start_thread(self) -> None:
+        logger.info("Starting thread")
         if self.thread is not None:
             raise Exception(
-                "[core.shared_context.SharedContext] Tried to start thread multiple times"
+                "Tried to start thread multiple times"
             )
         self.thread = threading.Thread(
             target=self.start,
@@ -26,6 +31,7 @@ class SharedContext:
         self.thread.start()
 
     def start(self) -> None:
+        logger.debug("Creating window")
         glfw.window_hint(glfw.VISIBLE, glfw.FALSE)
         self.window = glfw.create_window(
             1, 1, "Shared Context", None, self.parent.window
@@ -34,9 +40,11 @@ class SharedContext:
 
         glfw.make_context_current(self.window)
 
+        logger.info("Starting mainloop")
         while self.state.alive:
             self.step()
         
+        logger.info("Cleaning up")
         if self.state.world:
             self.state.world.on_close()
         if self.state.mesh_handler:

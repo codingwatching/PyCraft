@@ -11,6 +11,6 @@ uniform vec3 fog_color = vec3(0.5, 0.69, 1.0);
 
 void main() {
     vec4 tex_color = texture(textures, vec3(v_uv, v_tex_index));
-    float fog_factor = exp(-v_fog_distance * 0.042);
+    float fog_factor = exp(-v_fog_distance * 0.017);
     out_color = mix(vec4(fog_color, tex_color.a), tex_color, fog_factor);
 }

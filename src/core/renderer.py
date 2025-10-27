@@ -1,5 +1,7 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
+import logging
+logger = logging.getLogger(__name__) 
 
 import numpy as np
 from OpenGL.GL import (
@@ -54,6 +56,8 @@ class Renderer:
 
         self.mesh_handler: MeshHandler = MeshHandler(state)
         self.camera: Camera = Camera(state)
+
+        logger.info("Renderer instantiated.")
 
     def set_uniforms(self) -> None:
         view, projection = self.camera.get_matrix()

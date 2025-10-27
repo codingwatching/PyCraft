@@ -1,6 +1,9 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
 
+import logging
+logger = logging.getLogger(__name__) 
+
 if TYPE_CHECKING:
     from core.window import State
 
@@ -20,6 +23,8 @@ class World:
         else:
             raise RuntimeError("[terrain.world.World] tried to initialize world but the mesh handler wasn't registered")
 
+        logger.info("World instantiated.")
+
     def update(self) -> None:
         camera_chunk: Position = (0, 0, 0)
         if self.state.camera is not None:
@@ -38,5 +43,6 @@ class World:
         self.mesh.set_data(*data)
 
     def on_close(self) -> None:
+        logger.info("Sending kill signal to ChunkHandler")
         self.handler.kill()
 

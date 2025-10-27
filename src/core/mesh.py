@@ -131,18 +131,20 @@ class Mesh:
             if not buffer.ready:
                 buffer.send_to_gpu()
 
-        to_delete = []
+        buffer_to_delete = None
         latest = self.get_latest_buffer()
         for buffer in self.buffers:
             if buffer == latest:
                 continue
             if not buffer:
                 continue
-            to_delete.append(buffer)
 
-        for buffer in to_delete:
-            self.buffers.remove(buffer)
-            del buffer
+            buffer_to_delete = buffer
+            break
+
+        if buffer_to_delete is not None:
+            self.buffers.remove(buffer_to_delete)
+            del buffer_to_delete
 
     def on_close(self) -> None:
         del self.buffers
@@ -162,10 +164,11 @@ class MeshHandler:
             )
         self.state.mesh_handler = self
 
-        logger.info("MeshHandler instantiated successfully.")
+        logger.info("MeshHandler instantiated.")
 
     def new_mesh(self, id: str) -> Mesh:
         logger.info(f"Created new mesh with id {id}")
+
         buffer = Mesh(self.state)
         self.meshes[id] = buffer
         return buffer
@@ -194,7 +197,7 @@ class MeshHandler:
             pass
 
     def on_close(self) -> None:
-        logger.info("Cleaning up buffers...")
+        logger.info("Deallocating remaining buffers")
         try:
             for mesh in self.meshes:
                 self.meshes[mesh].on_close()
