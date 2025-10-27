@@ -23,6 +23,12 @@ def fractal_noise(x: float, z: float) -> float:
 
 PositionType: TypeAlias = tuple[int, int, int]
 
+BLOCKS = np.array([
+    [0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0],
+    [1, 1, 1, 1, 1, 1]
+], dtype=np.uint8)
+
 class ChunkMeshData:
     def __init__(self):
         self.position: list[list[float]] = []
@@ -97,7 +103,10 @@ class Chunk:
         heights = np.vectorize(lambda x, z: fractal_noise(x, z))(x_grid, z_grid)
         heights = heights.astype(np.float32)
 
-        terrain = (y_coords[None, :, None] < heights[:, None, :]).astype(np.uint8)
+        terrain_mask = (y_coords[None, :, None] < heights[:, None, :]).astype(np.uint8) == 0
+        terrain = np.random.randint(1, 3, (CHUNK_SIDE, CHUNK_SIDE, CHUNK_SIDE))
+        terrain[terrain_mask] = 0
+
         self.terrain[1:-1, 1:-1, 1:-1] = terrain
         self.state = TERRAIN_GENERATED
 
@@ -124,13 +133,13 @@ class Chunk:
 
             return False
 
+        wx = self.position[0] * CHUNK_SIDE + xs
+        wy = self.position[1] * CHUNK_SIDE + ys
+        wz = self.position[2] * CHUNK_SIDE + zs
+
         xs += 1
         ys += 1
         zs += 1
-
-        wx = self.position[0] * CHUNK_SIDE + (xs - 1) - CHUNK_SIDE // 2
-        wy = self.position[1] * CHUNK_SIDE + (ys - 1) - CHUNK_SIDE // 2
-        wz = self.position[2] * CHUNK_SIDE + (zs - 1) - CHUNK_SIDE // 2
 
         positions = []
         orientations = []
@@ -138,10 +147,16 @@ class Chunk:
 
         for face, (dx, dy, dz) in FACES:
             neighbor_mask = terrain[xs + dx, ys + dy, zs + dz] == 0
-            if np.any(neighbor_mask):
-                positions.extend(np.column_stack((wx[neighbor_mask], wy[neighbor_mask], wz[neighbor_mask])).tolist())
-                orientations.extend(np.full(np.sum(neighbor_mask), face, dtype=np.uint32).tolist())
-                tex_ids.extend(np.random.randint(0, 2, np.sum(neighbor_mask), dtype=np.uint32).tolist())
+            if not np.any(neighbor_mask):
+                continue
+
+            positions.extend(np.column_stack((wx[neighbor_mask], wy[neighbor_mask], wz[neighbor_mask])).tolist())
+            orientations.extend(np.full(np.sum(neighbor_mask), face, dtype=np.uint32).tolist())
+
+            block_types = terrain[xs, ys, zs]
+            visible_blocks = block_types[neighbor_mask]
+            face_tex = BLOCKS[visible_blocks, face]
+            tex_ids.extend(face_tex.tolist())
 
         if positions:
             self.meshdata.position = positions
