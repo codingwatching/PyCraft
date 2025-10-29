@@ -57,6 +57,14 @@ class Chunk:
     def id_string(self) -> str:
         return f"chunk_{self.position[0]}_{self.position[1]}_{self.position[2]}_{self.level}"
 
+    @property
+    def center_pos(self) -> tuple[float, float, float]:
+        side = CHUNK_SIDE * self.scale
+        cx = (self.position[0] + 0.5) * side
+        cy = (self.position[1] + 0.5) * side
+        cz = (self.position[2] + 0.5) * side
+        return (cx, cy, cz)
+
     def update_neighbour_terrain(self, storage: ChunkStorage) -> None:
         logger.debug(f"Chunk {self.id_string} updating neighbour terrain")
         raise NotImplementedError
@@ -212,6 +220,7 @@ class OctreeNode:
         del self.children
         self.children = {}
 
+
     def update(self, camera_position: Position):
         scale = 2 ** self.level
         side = CHUNK_SIDE * scale
@@ -228,8 +237,8 @@ class OctreeNode:
             (center_z - cz) ** 2
         )
 
-        split_threshold = side * 2.5
-        unsplit_threshold = side * 4.0
+        split_threshold = side * 3.21
+        unsplit_threshold = side * 4.32
 
         if distance < split_threshold and self.level > 0:
             if not self.is_split:
@@ -329,14 +338,18 @@ class ChunkStorage:
         for position in to_delete:
             del self.nodes[position]
 
-        # update nodes
         for node in self.nodes.values():
             node.update(camera_position)
 
-        # todo sort by ABSOLUTE distance. not scaled.
-        # And weight by level while you're at it.
-        # self.build_queue = self.sort_by_distance(self.build_queue)
-        # self.rebuild_queue = self.sort_by_distance(self.rebuild_queue)
+        def distance_to_camera(chunk_id: str) -> float:
+            chunk = self.chunks.get(chunk_id)
+            if chunk is None:
+                return float('inf')
+            cx, cy, cz = chunk.center_pos
+            camx, camy, camz = camera_position
+            return np.sqrt((cx - camx)**2 + (cy - camy)**2 + (cz - camz)**2)
+
+        self.build_queue.sort(key=distance_to_camera)
 
         count = 0
         while len(self.build_queue) > 0 and count < BATCH_SIZE:
