@@ -15,7 +15,7 @@ class Camera:
         self.fov: float = 45.0
         self.aspect: float = 16 / 9
         self.near: float = 0.1
-        self.far: float = 1000.0
+        self.far: float = 1000000000.0
 
         self.state: State = state
         self.position: list[float] = [0.0, 0.0, 0.0]

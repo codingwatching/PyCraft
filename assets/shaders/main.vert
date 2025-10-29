@@ -1,13 +1,14 @@
 #version 330 core
 
 layout(location = 0) in vec3 position;
-layout(location = 1) in float orientation;  // 0=front, 1=back, 2=left, 3=right, 4=top, 5=bottom
+layout(location = 1) in float orientation;
 layout(location = 2) in float tex_id;
+layout(location = 3) in int scale_multiplier;
 
 out vec3 v_pos;
 flat out float v_tex_index;
 out vec2 v_uv;
-out float v_fog_distance; // distance from camera
+out float v_fog_distance;
 
 uniform mat4 view;
 uniform mat4 projection;
@@ -17,18 +18,23 @@ vec3 cubeVertex(int idx) {
         // FRONT (+Z)
         vec3(-0.5,-0.5,0.5), vec3(0.5,-0.5,0.5), vec3(0.5, 0.5,0.5),
         vec3(0.5, 0.5,0.5), vec3(-0.5, 0.5,0.5), vec3(-0.5,-0.5,0.5),
+
         // BACK (-Z)
         vec3(0.5,-0.5,-0.5), vec3(-0.5,-0.5,-0.5), vec3(-0.5, 0.5,-0.5),
         vec3(-0.5, 0.5,-0.5), vec3(0.5, 0.5,-0.5), vec3(0.5,-0.5,-0.5),
+
         // LEFT (-X)
         vec3(-0.5,-0.5,-0.5), vec3(-0.5,-0.5, 0.5), vec3(-0.5, 0.5, 0.5),
         vec3(-0.5, 0.5, 0.5), vec3(-0.5, 0.5,-0.5), vec3(-0.5,-0.5,-0.5),
+
         // RIGHT (+X)
         vec3(0.5,-0.5, 0.5), vec3(0.5,-0.5,-0.5), vec3(0.5, 0.5,-0.5),
         vec3(0.5, 0.5,-0.5), vec3(0.5, 0.5, 0.5), vec3(0.5,-0.5, 0.5),
+
         // TOP (+Y)
         vec3(-0.5,0.5, 0.5), vec3(0.5,0.5, 0.5), vec3(0.5,0.5,-0.5),
         vec3(0.5,0.5,-0.5), vec3(-0.5,0.5,-0.5), vec3(-0.5,0.5, 0.5),
+
         // BOTTOM (-Y)
         vec3(-0.5,-0.5,-0.5), vec3(0.5,-0.5,-0.5), vec3(0.5,-0.5, 0.5),
         vec3(0.5,-0.5, 0.5), vec3(-0.5,-0.5, 0.5), vec3(-0.5,-0.5,-0.5)
@@ -41,18 +47,23 @@ vec2 cubeUV(int idx) {
         // FRONT (+Z)
         vec2(0,0), vec2(1,0), vec2(1,1),
         vec2(1,1), vec2(0,1), vec2(0,0),
+
         // BACK (-Z)
         vec2(0,0), vec2(1,0), vec2(1,1),
         vec2(1,1), vec2(0,1), vec2(0,0),
+
         // LEFT (-X)
         vec2(0,0), vec2(1,0), vec2(1,1),
         vec2(1,1), vec2(0,1), vec2(0,0),
+
         // RIGHT (+X)
         vec2(0,0), vec2(1,0), vec2(1,1),
         vec2(1,1), vec2(0,1), vec2(0,0),
+
         // TOP (+Y)
         vec2(0,0), vec2(1,0), vec2(1,1),
         vec2(1,1), vec2(0,1), vec2(0,0),
+
         // BOTTOM (-Y)
         vec2(0,0), vec2(1,0), vec2(1,1),
         vec2(1,1), vec2(0,1), vec2(0,0)
@@ -65,7 +76,7 @@ void main() {
     int vert_id = gl_VertexID % 6; // vertex within face
     int idx = face * 6 + vert_id;  // final vertex index
 
-    vec3 local_pos = cubeVertex(idx);
+    vec3 local_pos = cubeVertex(idx) * scale_multiplier;  // apply scale
     vec3 world_pos = position + local_pos;
 
     gl_Position = projection * view * vec4(world_pos, 1.0);

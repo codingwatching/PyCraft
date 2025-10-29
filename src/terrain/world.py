@@ -8,9 +8,7 @@ if TYPE_CHECKING:
     from core.window import State
 
 from core.mesh import Mesh
-from type_hints import Position
 from .chunk_handler import ChunkHandler
-from constants import CHUNK_SIDE
 
 class World:
     def __init__(self, state: State) -> None:
@@ -26,15 +24,10 @@ class World:
         logger.info("World instantiated.")
 
     def update(self) -> None:
-        camera_chunk: Position = (0, 0, 0)
+        camera_position: list[float] = (0, 0, 0)
         if self.state.camera is not None:
-            player_position: list[float] = self.state.camera.position
-            camera_chunk = (
-                int(player_position[0] // CHUNK_SIDE),
-                int(player_position[1] // CHUNK_SIDE),
-                int(player_position[2] // CHUNK_SIDE)
-            )
-        self.handler.set_camera_chunk(camera_chunk)
+            camera_position: list[float] = self.state.camera.position
+        self.handler.set_camera_position(camera_position)
 
         if not self.handler.changed:
             return

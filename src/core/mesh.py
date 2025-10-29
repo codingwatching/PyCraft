@@ -34,6 +34,7 @@ instance_dtype = np.dtype([
     ("position", np.float32, 3),
     ("orientation", np.uint32),
     ("tex_id", np.float32),
+    ("scale", np.uint32),
 ])
 
 
@@ -78,7 +79,7 @@ class Mesh:
             break
         return latest
 
-    def set_data(self, position: BufferData, orientation: BufferData, tex_id: BufferData) -> None:
+    def set_data(self, position: BufferData, orientation: BufferData, tex_id: BufferData, scale: BufferData) -> None:
         if not (len(position) == len(tex_id) == len(orientation)):
             raise RuntimeError("buffer lengths don't match")
 
@@ -89,6 +90,7 @@ class Mesh:
         data['position'][:] = position
         data['orientation'][:] = orientation
         data['tex_id'][:] = tex_id
+        data['scale'][:] = scale
 
         logger.debug(f"Updating mesh data (length {len(data)})")
         buffer = DisposableBuffer(data)
@@ -105,6 +107,7 @@ class Mesh:
         offset_pos = buffer.data.dtype.fields['position'][1]
         offset_ori = buffer.data.dtype.fields['orientation'][1]
         offset_tex = buffer.data.dtype.fields['tex_id'][1]
+        offset_scl = buffer.data.dtype.fields['scale'][1]
 
         glEnableVertexAttribArray(0)
         glVertexAttribPointer(0, 3, GL_FLOAT, False, stride, ctypes.c_void_p(offset_pos))
@@ -117,6 +120,10 @@ class Mesh:
         glEnableVertexAttribArray(2)
         glVertexAttribPointer(2, 1, GL_FLOAT, False, stride, ctypes.c_void_p(offset_tex))
         glVertexAttribDivisor(2, 1)
+
+        glEnableVertexAttribArray(3)
+        glVertexAttribPointer(3, 1, GL_FLOAT, False, stride, ctypes.c_void_p(offset_scl))
+        glVertexAttribDivisor(3, 1)
 
         glDrawArraysInstanced(GL_TRIANGLES, 0, 6, len(buffer.data))
 

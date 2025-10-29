@@ -6,7 +6,6 @@ import multiprocessing
 from multiprocessing.managers import SyncManager, NamespaceProxy
 from core.mesh import BufferData
 from .chunk import ChunkStorage
-from type_hints import Position
 
 class ChunkHandler:
     manager: SyncManager
@@ -18,7 +17,7 @@ class ChunkHandler:
         self.namespace = self.manager.Namespace()
         self.namespace.mesh_data = None
         self.namespace.changed = False
-        self.namespace.camera_chunk = (0, 0, 0)
+        self.namespace.camera_position = (0, 0, 0)
         self.namespace.alive = True
 
         logger.info("Starting worker")
@@ -35,7 +34,7 @@ class ChunkHandler:
 
         logger.info("Worker: starting mainloop")
         while self.namespace.alive:
-            storage.update(namespace.camera_chunk)
+            storage.update(namespace.camera_position)
 
             if not storage.changed:
                 sleep(1/60)
@@ -53,8 +52,8 @@ class ChunkHandler:
     def changed(self) -> bool:
         return self.namespace.changed
 
-    def set_camera_chunk(self, position: Position) -> None:
-        self.namespace.camera_chunk = position
+    def set_camera_position(self, position: list[float]) -> None:
+        self.namespace.camera_position = position
 
     def kill(self) -> None:
         logger.info("Terminating worker")
