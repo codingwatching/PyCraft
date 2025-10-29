@@ -1,7 +1,7 @@
 RENDER_DIST = 6
 BATCH_SIZE = 42
 
-HIGHEST_LEVEL = 8
+HIGHEST_LEVEL = 12
 CHUNK_SIDE = 16
 CHUNK_DIMS = tuple([
     CHUNK_SIDE + 2 for _ in range(3)

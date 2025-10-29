@@ -83,7 +83,7 @@ void main() {
 
     v_pos = local_pos;
     v_tex_index = tex_id;
-    v_uv = cubeUV(idx);
+    v_uv = cubeUV(idx) * scale_multiplier;
 
     // fog distance (camera space z)
     v_fog_distance = length((view * vec4(world_pos, 1.0)).xyz);
