@@ -41,6 +41,12 @@ class ChunkMeshData:
         self.tex_id = []
         self.scale = []
 
+    def append(self, other: ChunkMeshData):
+        self.position.extend(other.position)
+        self.orientation.extend(other.orientation)
+        self.tex_id.extend(other.tex_id)
+        self.scale.extend(other.scale)
+
 class Chunk:
     def __init__(self, position: PositionType, level: int = HIGHEST_LEVEL):
         self.position: PositionType = position
@@ -49,7 +55,7 @@ class Chunk:
         self.scale: int = 2 ** level
 
         self.terrain: np.typing.NDArray[np.uint8] = np.zeros(CHUNK_DIMS, dtype=np.uint8)
-        self.meshdata: ChunkMeshData = ChunkMeshData()
+        self.mesh_data: ChunkMeshData = ChunkMeshData()
 
         logger.debug(f"New chunk created: {self.id_string}")
 
@@ -65,14 +71,9 @@ class Chunk:
         cz = (self.position[2] + 0.5) * side
         return (cx, cy, cz)
 
-    def update_neighbour_terrain(self, storage: ChunkStorage) -> None:
-        logger.debug(f"Chunk {self.id_string} updating neighbour terrain")
-        raise NotImplementedError
-
     def generate_terrain(self) -> None:
         logger.debug(f"Chunk {self.id_string} Generating terrain (scale={self.scale})")
 
-        # Compute world-space coordinates with padding
         x_coords = np.arange(CHUNK_DIMS[0]) + self.position[0] * CHUNK_SIDE - 1
         y_coords = np.arange(CHUNK_DIMS[1]) + self.position[1] * CHUNK_SIDE - 1
         z_coords = np.arange(CHUNK_DIMS[2]) + self.position[2] * CHUNK_SIDE - 1
@@ -81,15 +82,12 @@ class Chunk:
         world_y = y_coords * self.scale
         world_z = z_coords * self.scale
 
-        # Heightmap generation
         x_grid, z_grid = np.meshgrid(world_x, world_z, indexing='ij')
         heights = np.vectorize(lambda x, z: fractal_noise(x, z))(x_grid, z_grid)
         heights = heights.astype(np.float32)
 
-        # Allocate full terrain including padding
         terrain = np.zeros(CHUNK_DIMS, dtype=np.uint8)
 
-        # Fill blocks below height
         for i, y in enumerate(world_y):
             mask = y < heights
             solid = np.random.randint(1, 3, mask.shape, dtype=np.uint8)
@@ -98,29 +96,26 @@ class Chunk:
         self.terrain = terrain
         self.state = TERRAIN_GENERATED
 
-    def generate_mesh(self) -> bool: # storage: Storage
+    def generate_mesh(self) -> bool:
         logger.debug(f"Chunk {self.id_string} Generating mesh (scale={self.scale})")
 
         if not np.any(self.terrain):
-            self.meshdata.clear()
+            self.mesh_data.clear()
             self.state = MESH_GENERATED
             return False
 
-        # self.update_neighbour_terrain(storage)
         terrain = self.terrain
 
         xs, ys, zs = np.nonzero(terrain[1:-1, 1:-1, 1:-1])
         if xs.size == 0:
-            self.meshdata.clear()
+            self.mesh_data.clear()
             self.state = MESH_GENERATED
             return False
 
-        # Base world offset (non-scaled grid)
         base_x = self.position[0] * CHUNK_SIDE
         base_y = self.position[1] * CHUNK_SIDE
         base_z = self.position[2] * CHUNK_SIDE
 
-        # Compute world-space coordinates with scale applied
         wx = (base_x + xs) * self.scale
         wy = (base_y + ys) * self.scale
         wz = (base_z + zs) * self.scale
@@ -150,13 +145,13 @@ class Chunk:
             scale.extend(np.full(np.sum(neighbor_mask), self.scale, dtype=np.uint32).tolist())
 
         if positions:
-            self.meshdata.position = positions
-            self.meshdata.orientation = orientations
-            self.meshdata.tex_id = tex_ids
-            self.meshdata.scale = scale
+            self.mesh_data.position = positions
+            self.mesh_data.orientation = orientations
+            self.mesh_data.tex_id = tex_ids
+            self.mesh_data.scale = scale
             logger.debug(f"Chunk {self.id_string} mesh generated.")
         else:
-            self.meshdata.clear()
+            self.mesh_data.clear()
             logger.debug(f"Chunk {self.id_string} mesh empty!")
 
         self.state = MESH_GENERATED
@@ -212,16 +207,17 @@ class OctreeNode:
                     child_node = OctreeNode(child_pos, self.storage, child_level)
                     self.children[child_node.id_string] = child_node
         
-        self.destroy_leaf()
         self.is_split = True
 
     def unsplit(self):
         self.is_split = False
-        del self.children
+        # dont delete children for now, let them sleep
         self.children = {}
 
-
     def update(self, camera_position: Position):
+        for child in self.children.values():
+            child.update(camera_position)
+
         scale = 2 ** self.level
         side = CHUNK_SIDE * scale
 
@@ -247,11 +243,26 @@ class OctreeNode:
             if self.is_split:
                 self.unsplit()
 
+    def get_mesh_data(self) -> ChunkMeshData:
+        if not self.is_split or self.level == 0:
+            return self.leaf.mesh_data
+
+        data = ChunkMeshData()
         for child in self.children.values():
-            child.update(camera_position)
+            data.append(child.get_mesh_data())
+
+            if not child.leaf.state == MESH_GENERATED:
+                return self.leaf.mesh_data
+
+        return data
+
+    def dispose(self):
+        self.destroy_leaf()
+        for child in self.children.values():
+            child.dispose()
 
     def __del__(self):
-        self.destroy_leaf()
+        self.dispose()
 
 class ChunkStorage:
     chunks: dict[Position, Chunk]
@@ -277,36 +288,18 @@ class ChunkStorage:
 
     def generate_mesh_data(self) -> tuple | None:
         logger.debug(f"Generating unified mesh data")
-        # todo ask the lod for this data instead,
-        # make it spit out the lowest leaves.
-        # build the aggregate from that
-        # then, the lod gets to decide which chunks to give,
-        # and hence we can do things like keep the unsplit
-        # leaf until the split nodes are done generating.
+        final_data = ChunkMeshData()
 
-        position: list[list[float]] = []
-        orientation: list[int] = []
-        tex_id: list[float] = []
-        scale: list[int] = []
-
-        for id in list(self.chunks.keys()):
-            chunk = self.chunks[id]
-
-            if chunk.state != MESH_GENERATED:
-                continue
-
-            data = chunk.meshdata
-            position.extend(data.position)
-            orientation.extend(data.orientation)
-            tex_id.extend(data.tex_id)
-            scale.extend(data.scale)
+        for node in self.nodes.values():
+            data = node.get_mesh_data()
+            final_data.append(data)
 
         try:
-            return (
-                np.array(position, dtype = np.float32),
-                np.array(orientation, dtype = np.float32),
-                np.array(tex_id, dtype = np.float32),
-                np.array(scale, dtype = np.float32)
+            return ( # todo data.to_numpy() cvt directly to the struct thing.
+                np.array(final_data.position, dtype = np.float32),
+                np.array(final_data.orientation, dtype = np.float32),
+                np.array(final_data.tex_id, dtype = np.float32),
+                np.array(final_data.scale, dtype = np.float32)
             )
         except ValueError:
             return None
@@ -314,6 +307,9 @@ class ChunkStorage:
     def update(self, camera_position: Position):
         self.changed = False
         self.camera_node = tuple((camera_position[i] // CHUNK_SIDE) // (2 ** (HIGHEST_LEVEL)) for i in range(3))
+
+        if not self.nodes:
+            logger.warning("Loading initial terrain, this may take a while...")
 
         required_nodes: set[Position] = set()
         for x in range(-RENDER_DIST, RENDER_DIST + 1):
