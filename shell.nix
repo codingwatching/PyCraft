@@ -1,17 +1,24 @@
 { pkgs ? import <nixpkgs> { } }:
 
+let
+    pyfastnoisesimd = import ./pyfastnoisesimd.nix {
+        inherit (pkgs) lib fetchPypi;
+        buildPythonPackage = pkgs.python312Packages.buildPythonPackage;
+        numpy = pkgs.python312Packages.numpy;
+    };
+in
+
 with pkgs;
 
-mkShell rec {
+mkShell {
     buildInputs = [
-        python313
-        python313Packages.pyopengl
-        python313Packages.pyopengl-accelerate
-        python313Packages.glfw
-        python313Packages.pyglm
-        python313Packages.numpy
-        python313Packages.pillow
-        python313Packages.noise
+        python312
+        python312Packages.pyopengl
+        python312Packages.pyopengl-accelerate
+        python312Packages.glfw
+        python312Packages.pyglm
+        python312Packages.numpy
+        python312Packages.pillow
+        pyfastnoisesimd
     ];
-    LD_LIBRARY_PATH = lib.makeLibraryPath buildInputs;
 }

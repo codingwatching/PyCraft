@@ -9,6 +9,7 @@ out vec3 v_pos;
 flat out float v_tex_index;
 out vec2 v_uv;
 out float v_fog_distance;
+flat out float v_orientation;
 
 uniform mat4 view;
 uniform mat4 projection;
@@ -87,5 +88,6 @@ void main() {
 
     // fog distance (camera space z)
     v_fog_distance = length((view * vec4(world_pos, 1.0)).xyz);
+    v_orientation = orientation;
 }
 

@@ -8,11 +8,13 @@ Meet Voxl, a highly optimized infinite procedural voxel terrain generating thing
 ## Features
 - Infinite terrain with no bounds in any axis. (yes, no height limit!)
 - Simplex noise-based terrain generation (very wip)
+- LOD system
 
 ## Roadmap
 - Multiple block types
 - Greedy meshing
-- LOD system
+- Block shading (we need normals for this, but can use the "orientation" thing instead).
+- Stitching different LOD levels together
 - Implement moddability early-on. Even the base game data is a "mod". Kind of like KSP. Just put a mod in the mod folder and you're done!
 - Better, more interesting / explorable terrain
 - Actual player movement

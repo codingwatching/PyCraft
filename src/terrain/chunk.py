@@ -3,21 +3,21 @@ from __future__ import annotations
 import logging
 logger = logging.getLogger(__name__) 
 
-from noise import snoise2
+from time import time
+import pyfastnoisesimd as fns
 import numpy as np
 from typing import TypeAlias
 from functools import lru_cache
 
 from type_hints import Position
-from constants import NOT_GENERATED, CHUNK_DIMS, CHUNK_SIDE, HIGHEST_LEVEL, MESH_GENERATED, TERRAIN_GENERATED, FACES
-from constants import RENDER_DIST, BATCH_SIZE
+from constants import NOT_GENERATED, CHUNK_DIMS, CHUNK_SIDE, HIGHEST_LEVEL, MESH_GENERATED, TERRAIN_GENERATED, FACES, RENDER_DIST
 
 @lru_cache()
 def fractal_noise(x: float, z: float) -> float:
     return (
         snoise2(x / 100, z / 100) * 10 +
-        snoise2(x / 1000, z / 1000) * 100 +
-        snoise2(x / 10000, z / 10000) * 1000
+        snoise2(x / 10000, z / 10000) * 1000 +
+        snoise2(x / 1000000, z / 1000000) * 100000
     )
 
 PositionType: TypeAlias = tuple[int, int, int]
@@ -74,6 +74,7 @@ class Chunk:
     def generate_terrain(self) -> None:
         logger.debug(f"Chunk {self.id_string} Generating terrain (scale={self.scale})")
 
+        t = time()
         x_coords = np.arange(CHUNK_DIMS[0]) + self.position[0] * CHUNK_SIDE - 1
         y_coords = np.arange(CHUNK_DIMS[1]) + self.position[1] * CHUNK_SIDE - 1
         z_coords = np.arange(CHUNK_DIMS[2]) + self.position[2] * CHUNK_SIDE - 1
@@ -95,6 +96,7 @@ class Chunk:
 
         self.terrain = terrain
         self.state = TERRAIN_GENERATED
+        print(time() - t)
 
     def generate_mesh(self) -> bool:
         logger.debug(f"Chunk {self.id_string} Generating mesh (scale={self.scale})")
@@ -233,8 +235,9 @@ class OctreeNode:
             (center_z - cz) ** 2
         )
 
-        split_threshold = side * 3.21
-        unsplit_threshold = side * 4.32
+        factor = max([5 - self.level // 2, 4])
+        split_threshold = side * factor
+        unsplit_threshold = side * (factor + 1)
 
         if distance < split_threshold and self.level > 0:
             if not self.is_split:
@@ -347,9 +350,8 @@ class ChunkStorage:
 
         self.build_queue.sort(key=distance_to_camera)
 
-        count = 0
-        while len(self.build_queue) > 0 and count < BATCH_SIZE:
+        while len(self.build_queue) > 0:
             position = self.build_queue.pop(0)
-            if self.build_chunk(position):
-                count += 1
+            self.build_chunk(position)
+            self.changed = True
 
