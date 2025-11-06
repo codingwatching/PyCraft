@@ -3,22 +3,22 @@ from __future__ import annotations
 import logging
 logger = logging.getLogger(__name__) 
 
-from time import time
 import pyfastnoisesimd as fns
 import numpy as np
 from typing import TypeAlias
-from functools import lru_cache
 
 from type_hints import Position
 from constants import NOT_GENERATED, CHUNK_DIMS, CHUNK_SIDE, HIGHEST_LEVEL, MESH_GENERATED, TERRAIN_GENERATED, FACES, RENDER_DIST
 
-@lru_cache()
-def fractal_noise(x: float, z: float) -> float:
-    return (
-        snoise2(x / 100, z / 100) * 10 +
-        snoise2(x / 10000, z / 10000) * 1000 +
-        snoise2(x / 1000000, z / 1000000) * 100000
-    )
+seed = np.random.randint(2**31)
+N_threads = 12
+perlin = fns.Noise(seed=seed, numWorkers=N_threads)
+perlin.frequency = 0.004
+perlin.noiseType = fns.NoiseType.Perlin
+perlin.fractal.octaves = 12
+perlin.fractal.lacunarity = 128
+perlin.fractal.gain = 42
+perlin.perturb.perturbType = fns.PerturbType.NoPerturb
 
 PositionType: TypeAlias = tuple[int, int, int]
 
@@ -74,7 +74,6 @@ class Chunk:
     def generate_terrain(self) -> None:
         logger.debug(f"Chunk {self.id_string} Generating terrain (scale={self.scale})")
 
-        t = time()
         x_coords = np.arange(CHUNK_DIMS[0]) + self.position[0] * CHUNK_SIDE - 1
         y_coords = np.arange(CHUNK_DIMS[1]) + self.position[1] * CHUNK_SIDE - 1
         z_coords = np.arange(CHUNK_DIMS[2]) + self.position[2] * CHUNK_SIDE - 1
@@ -83,20 +82,27 @@ class Chunk:
         world_y = y_coords * self.scale
         world_z = z_coords * self.scale
 
-        x_grid, z_grid = np.meshgrid(world_x, world_z, indexing='ij')
-        heights = np.vectorize(lambda x, z: fractal_noise(x, z))(x_grid, z_grid)
-        heights = heights.astype(np.float32)
+        x_grid, y_grid, z_grid = np.meshgrid(world_x, world_y, world_z, indexing='ij')
+        x_grid = x_grid.flatten()
+        y_grid = y_grid.flatten()
+        z_grid = z_grid.flatten()
 
+        n = len(x_grid)
+        coords = fns.empty_coords(n)
+        coords[0, :n] = x_grid
+        coords[1, :n] = np.full(n, 0)
+        coords[2, :n] = z_grid
+
+        heights = perlin.genFromCoords(coords)[:n].reshape(CHUNK_SIDE + 2, CHUNK_SIDE + 2, CHUNK_SIDE + 2)
         terrain = np.zeros(CHUNK_DIMS, dtype=np.uint8)
 
         for i, y in enumerate(world_y):
-            mask = y < heights
+            mask = y < heights[:, 0, :] * 42
             solid = np.random.randint(1, 3, mask.shape, dtype=np.uint8)
             terrain[:, i, :][mask] = solid[mask]
 
         self.terrain = terrain
         self.state = TERRAIN_GENERATED
-        print(time() - t)
 
     def generate_mesh(self) -> bool:
         logger.debug(f"Chunk {self.id_string} Generating mesh (scale={self.scale})")
@@ -235,7 +241,7 @@ class OctreeNode:
             (center_z - cz) ** 2
         )
 
-        factor = max([5 - self.level // 2, 4])
+        factor = max([int(7 - self.level / HIGHEST_LEVEL), 6])
         split_threshold = side * factor
         unsplit_threshold = side * (factor + 1)
 
