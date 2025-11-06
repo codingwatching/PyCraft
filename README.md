@@ -10,13 +10,13 @@ Meet Voxl, a highly optimized infinite procedural voxel terrain generating thing
 - Simplex noise-based terrain generation (very wip)
 - LOD system
 
-## Currently working on
+### Currently working on
 - Multiple block types
-- Stitching different LOD levels together
+- Stitching different LOD levels together (maybe by skirting higher levels at boundaries?)
 - Block shading (we need normals for this, but can use the "orientation" thing instead).
 - Only render the chunks that the player can actually see.
 
-## Roadmap
+### Roadmap
 - Greedy meshing
 - Implement moddability early-on. Even the base game data is a "mod". Kind of like KSP. Just put a mod in the mod folder and you're done!
 - Better, more interesting / explorable terrain
