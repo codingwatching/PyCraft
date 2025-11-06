@@ -1,9 +1,22 @@
 RENDER_DIST = 4
-HIGHEST_LEVEL = 8
+HIGHEST_LEVEL = 12
 CHUNK_SIDE = 16
 CHUNK_DIMS = tuple([
     CHUNK_SIDE + 2 for _ in range(3)
 ])  # Padding of 2 for neighbouring chunk data
+
+HEURISTIC = [
+    12,
+    11,
+    10,
+    8,
+    7,
+    6,
+    5,
+    4,
+    3,
+    2
+] + list((2 for _ in range(42)))
 
 # TODO: Use enums instead of whatever this is
 NOT_GENERATED = 0

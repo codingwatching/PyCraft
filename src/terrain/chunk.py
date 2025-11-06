@@ -6,10 +6,9 @@ logger = logging.getLogger(__name__)
 import pyfastnoisesimd as fns
 import numpy as np
 from typing import TypeAlias
-from time import time
 
 from type_hints import Position
-from constants import NOT_GENERATED, CHUNK_DIMS, CHUNK_SIDE, HIGHEST_LEVEL, MESH_GENERATED, TERRAIN_GENERATED, FACES, RENDER_DIST
+from constants import NOT_GENERATED, CHUNK_DIMS, CHUNK_SIDE, HIGHEST_LEVEL, MESH_GENERATED, TERRAIN_GENERATED, FACES, RENDER_DIST, HEURISTIC
 
 seed = np.random.randint(2**31)
 N_threads = 12
@@ -100,7 +99,7 @@ class Chunk:
         # todo maybe club these requests together across multiple chunks
         # i.e. let something like ChunkStorage handle them.
         heights = perlin.genFromCoords(coords)[:n].reshape(CHUNK_SIDE + 2, CHUNK_SIDE + 2)
-        height_field = heights * 42
+        height_field = heights * 128
         Y = world_y.reshape(1, -1, 1)
         mask = Y < height_field[:, None, :]
 
@@ -235,7 +234,7 @@ class OctreeNode:
             (center_z - cz) ** 2
         )
 
-        factor = max([int(5 - self.level / HIGHEST_LEVEL), 4])
+        factor = HEURISTIC[self.level]
         split_threshold = side * factor
         unsplit_threshold = side * (factor + 1)
 
