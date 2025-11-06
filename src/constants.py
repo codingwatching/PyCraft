@@ -1,5 +1,5 @@
 RENDER_DIST = 4
-HIGHEST_LEVEL = 12
+HIGHEST_LEVEL = 8
 CHUNK_SIDE = 16
 CHUNK_DIMS = tuple([
     CHUNK_SIDE + 2 for _ in range(3)

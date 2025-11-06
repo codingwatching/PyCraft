@@ -6,6 +6,7 @@ logger = logging.getLogger(__name__)
 import pyfastnoisesimd as fns
 import numpy as np
 from typing import TypeAlias
+from time import time
 
 from type_hints import Position
 from constants import NOT_GENERATED, CHUNK_DIMS, CHUNK_SIDE, HIGHEST_LEVEL, MESH_GENERATED, TERRAIN_GENERATED, FACES, RENDER_DIST
@@ -74,17 +75,20 @@ class Chunk:
     def generate_terrain(self) -> None:
         logger.debug(f"Chunk {self.id_string} Generating terrain (scale={self.scale})")
 
-        x_coords = np.arange(CHUNK_DIMS[0]) + self.position[0] * CHUNK_SIDE - 1
-        y_coords = np.arange(CHUNK_DIMS[1]) + self.position[1] * CHUNK_SIDE - 1
-        z_coords = np.arange(CHUNK_DIMS[2]) + self.position[2] * CHUNK_SIDE - 1
+        start_x = (self.position[0] * CHUNK_SIDE - 1) * self.scale
+        end_x   = ((self.position[0] + 1) * CHUNK_SIDE + 1) * self.scale
+        world_x = np.linspace(start_x, end_x, CHUNK_DIMS[0])
 
-        world_x = x_coords * self.scale
-        world_y = y_coords * self.scale
-        world_z = z_coords * self.scale
+        start_y = (self.position[1] * CHUNK_SIDE - 1) * self.scale
+        end_y   = ((self.position[1] + 1) * CHUNK_SIDE + 1) * self.scale
+        world_y = np.linspace(start_y, end_y, CHUNK_DIMS[1])
 
-        x_grid, y_grid, z_grid = np.meshgrid(world_x, world_y, world_z, indexing='ij')
+        start_z = (self.position[2] * CHUNK_SIDE - 1) * self.scale
+        end_z   = ((self.position[2] + 1) * CHUNK_SIDE + 1) * self.scale
+        world_z = np.linspace(start_z, end_z, CHUNK_DIMS[2])
+
+        x_grid, z_grid = np.meshgrid(world_x, world_z, indexing='ij')
         x_grid = x_grid.flatten()
-        y_grid = y_grid.flatten()
         z_grid = z_grid.flatten()
 
         n = len(x_grid)
@@ -93,74 +97,64 @@ class Chunk:
         coords[1, :n] = np.full(n, 0)
         coords[2, :n] = z_grid
 
-        heights = perlin.genFromCoords(coords)[:n].reshape(CHUNK_SIDE + 2, CHUNK_SIDE + 2, CHUNK_SIDE + 2)
-        terrain = np.zeros(CHUNK_DIMS, dtype=np.uint8)
+        # todo maybe club these requests together across multiple chunks
+        # i.e. let something like ChunkStorage handle them.
+        heights = perlin.genFromCoords(coords)[:n].reshape(CHUNK_SIDE + 2, CHUNK_SIDE + 2)
+        height_field = heights * 42
+        Y = world_y.reshape(1, -1, 1)
+        mask = Y < height_field[:, None, :]
 
-        for i, y in enumerate(world_y):
-            mask = y < heights[:, 0, :] * 42
-            solid = np.random.randint(1, 3, mask.shape, dtype=np.uint8)
-            terrain[:, i, :][mask] = solid[mask]
+        terrain = np.zeros_like(mask, dtype=np.uint8)
+        terrain[mask] = np.random.randint(1, 3, size=np.count_nonzero(mask), dtype=np.uint8)
 
         self.terrain = terrain
         self.state = TERRAIN_GENERATED
 
     def generate_mesh(self) -> bool:
-        logger.debug(f"Chunk {self.id_string} Generating mesh (scale={self.scale})")
-
-        if not np.any(self.terrain):
-            self.mesh_data.clear()
-            self.state = MESH_GENERATED
-            return False
-
         terrain = self.terrain
+        self.mesh_data.clear()
 
-        xs, ys, zs = np.nonzero(terrain[1:-1, 1:-1, 1:-1])
-        if xs.size == 0:
-            self.mesh_data.clear()
+        if not np.any(terrain):
             self.state = MESH_GENERATED
             return False
 
-        base_x = self.position[0] * CHUNK_SIDE
-        base_y = self.position[1] * CHUNK_SIDE
-        base_z = self.position[2] * CHUNK_SIDE
-
-        wx = (base_x + xs) * self.scale
-        wy = (base_y + ys) * self.scale
-        wz = (base_z + zs) * self.scale
-
-        xs += 1
-        ys += 1
-        zs += 1
+        solid = terrain[1:-1, 1:-1, 1:-1] > 0
+        if not np.any(solid):
+            self.state = MESH_GENERATED
+            return False
 
         positions = []
         orientations = []
         tex_ids = []
-        scale = []
+        scales = []
 
         for face, (dx, dy, dz) in FACES:
-            neighbor_mask = terrain[xs + dx, ys + dy, zs + dz] == 0
-            if not np.any(neighbor_mask):
+            neighbor = terrain[1+dx:-1+dx or None, 1+dy:-1+dy or None, 1+dz:-1+dz or None]
+            visible_mask = solid & (neighbor == 0)
+
+            if not np.any(visible_mask):
                 continue
 
-            positions.extend(np.column_stack((wx[neighbor_mask], wy[neighbor_mask], wz[neighbor_mask])).tolist())
-            orientations.extend(np.full(np.sum(neighbor_mask), face, dtype=np.uint32).tolist())
+            vx, vy, vz = np.nonzero(visible_mask)
+            wxv = (self.position[0] * CHUNK_SIDE + vx) * self.scale
+            wyv = (self.position[1] * CHUNK_SIDE + vy) * self.scale
+            wzv = (self.position[2] * CHUNK_SIDE + vz) * self.scale
 
-            block_types = terrain[xs, ys, zs]
-            visible_blocks = block_types[neighbor_mask]
-            face_tex = BLOCKS[visible_blocks, face]
-            tex_ids.extend(face_tex.tolist())
+            positions.append(np.column_stack((wxv, wyv, wzv)))
+            orientations.append(np.full(vx.shape[0], face, np.uint32))
 
-            scale.extend(np.full(np.sum(neighbor_mask), self.scale, dtype=np.uint32).tolist())
+            visible_blocks = terrain[1:-1, 1:-1, 1:-1][visible_mask]
+            tex_ids.append(BLOCKS[visible_blocks, face])
+            scales.append(np.full(vx.shape[0], self.scale, np.uint32))
 
-        if positions:
-            self.mesh_data.position = positions
-            self.mesh_data.orientation = orientations
-            self.mesh_data.tex_id = tex_ids
-            self.mesh_data.scale = scale
-            logger.debug(f"Chunk {self.id_string} mesh generated.")
-        else:
-            self.mesh_data.clear()
-            logger.debug(f"Chunk {self.id_string} mesh empty!")
+        if not positions:
+            self.state = MESH_GENERATED
+            return False
+
+        self.mesh_data.position = np.concatenate(positions).tolist()
+        self.mesh_data.orientation = np.concatenate(orientations).tolist()
+        self.mesh_data.tex_id = np.concatenate(tex_ids).tolist()
+        self.mesh_data.scale = np.concatenate(scales).tolist()
 
         self.state = MESH_GENERATED
         return True
@@ -241,7 +235,7 @@ class OctreeNode:
             (center_z - cz) ** 2
         )
 
-        factor = max([int(7 - self.level / HIGHEST_LEVEL), 6])
+        factor = max([int(5 - self.level / HIGHEST_LEVEL), 4])
         split_threshold = side * factor
         unsplit_threshold = side * (factor + 1)
 
