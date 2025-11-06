@@ -5,18 +5,7 @@ CHUNK_DIMS = tuple([
     CHUNK_SIDE + 2 for _ in range(3)
 ])  # Padding of 2 for neighbouring chunk data
 
-HEURISTIC = [
-    12,
-    11,
-    10,
-    8,
-    7,
-    6,
-    5,
-    4,
-    3,
-    2
-] + list((2 for _ in range(42)))
+HEURISTIC = [max([12 - i, 4]) for i in range(HIGHEST_LEVEL + 2)]
 
 # TODO: Use enums instead of whatever this is
 NOT_GENERATED = 0
