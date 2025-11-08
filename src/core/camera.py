@@ -28,7 +28,11 @@ class Camera:
         for i in range(3):
             thing = glm.vec3(0.0)
             thing[i] = 1.0
-            matrix = glm.rotate(matrix, glm.radians(self.rotation[i]), thing)
+            matrix = glm.rotate(
+                matrix,
+                glm.radians(self.rotation[i]),
+                thing
+            )
 
         position = [-i for i in self.position]
         matrix = glm.translate(matrix, glm.vec3(position))
@@ -40,7 +44,12 @@ class Camera:
         if height != 0:
             self.aspect = width / height
         
-        projection = glm.perspective(self.fov, self.aspect, self.near, self.far)
+        projection = glm.perspective(
+            self.fov,
+            self.aspect,
+            self.near,
+            self.far
+        )
         
         return matrix, projection
 

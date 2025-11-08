@@ -75,8 +75,14 @@ class Renderer:
         projection_pos = glGetUniformLocation(shader, "projection")
         camera_pos = glGetUniformLocation(shader, "camera")
 
-        glUniformMatrix4fv(view_pos, 1, GL_FALSE, glm.value_ptr(view))
-        glUniformMatrix4fv(projection_pos, 1, GL_FALSE, glm.value_ptr(projection))
+        glUniformMatrix4fv(
+            view_pos, 1, GL_FALSE, 
+            glm.value_ptr(view)
+        )
+        glUniformMatrix4fv(
+            projection_pos, 1, GL_FALSE, 
+            glm.value_ptr(projection)
+        )
         glUniform3f(camera_pos, *camera)
 
     def drawcall(self) -> None:

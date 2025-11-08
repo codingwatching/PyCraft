@@ -63,7 +63,7 @@ class SharedContext:
         if self.window is not None:
             glfw.swap_buffers(self.window)
         else:
-            raise RuntimeError("[core.shared_context.SharedContext] tried to call self.step() but self.window is None")
+            raise RuntimeError("tried to call self.step() but window is None")
 
         glfw.poll_events()
 

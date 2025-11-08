@@ -79,7 +79,13 @@ class Mesh:
             break
         return latest
 
-    def set_data(self, position: BufferData, orientation: BufferData, tex_id: BufferData, scale: BufferData) -> None:
+    def set_data(
+        self, 
+        position: BufferData, 
+        orientation: BufferData, 
+        tex_id: BufferData, 
+        scale: BufferData
+    ) -> None:
         if not (len(position) == len(tex_id) == len(orientation)):
             raise RuntimeError("buffer lengths don't match")
 
@@ -110,19 +116,31 @@ class Mesh:
         offset_scl = buffer.data.dtype.fields['scale'][1]
 
         glEnableVertexAttribArray(0)
-        glVertexAttribPointer(0, 3, GL_FLOAT, False, stride, ctypes.c_void_p(offset_pos))
+        glVertexAttribPointer(
+            0, 3, GL_FLOAT, False, 
+            stride, ctypes.c_void_p(offset_pos)
+        )
         glVertexAttribDivisor(0, 1)
 
         glEnableVertexAttribArray(1)
-        glVertexAttribPointer(1, 1, GL_UNSIGNED_INT, False, stride, ctypes.c_void_p(offset_ori))
+        glVertexAttribPointer(
+            1, 1, GL_UNSIGNED_INT, False, 
+            stride, ctypes.c_void_p(offset_ori)
+        )
         glVertexAttribDivisor(1, 1)
 
         glEnableVertexAttribArray(2)
-        glVertexAttribPointer(2, 1, GL_FLOAT, False, stride, ctypes.c_void_p(offset_tex))
+        glVertexAttribPointer(
+            2, 1, GL_FLOAT, False,
+            stride, ctypes.c_void_p(offset_tex)
+        )
         glVertexAttribDivisor(2, 1)
 
         glEnableVertexAttribArray(3)
-        glVertexAttribPointer(3, 1, GL_FLOAT, False, stride, ctypes.c_void_p(offset_scl))
+        glVertexAttribPointer(
+            3, 1, GL_FLOAT, False,
+            stride, ctypes.c_void_p(offset_scl)
+        )
         glVertexAttribDivisor(3, 1)
 
         glDrawArraysInstanced(GL_TRIANGLES, 0, 6, len(buffer.data))
@@ -167,7 +185,7 @@ class MeshHandler:
 
         if self.state.mesh_handler is not None:
             raise Exception(
-                "[core.mesh.MeshHandler] Tried to create multiple instances of this class"
+                "Tried to register multiple instances of MeshHandler"
             )
         self.state.mesh_handler = self
 

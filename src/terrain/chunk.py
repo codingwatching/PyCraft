@@ -8,7 +8,17 @@ import numpy as np
 from typing import TypeAlias
 
 from type_hints import Position
-from constants import NOT_GENERATED, CHUNK_DIMS, CHUNK_SIDE, HIGHEST_LEVEL, MESH_GENERATED, TERRAIN_GENERATED, FACES, RENDER_DIST, HEURISTIC
+from constants import (
+    NOT_GENERATED,
+    CHUNK_DIMS,
+    CHUNK_SIDE,
+    HIGHEST_LEVEL,
+    MESH_GENERATED,
+    TERRAIN_GENERATED,
+    FACES,
+    RENDER_DIST,
+    HEURISTIC
+)
 
 seed = np.random.randint(2**31)
 N_threads = 12
@@ -48,20 +58,31 @@ class ChunkMeshData:
         self.scale.extend(other.scale)
 
 class Chunk:
-    def __init__(self, position: PositionType, level: int = HIGHEST_LEVEL):
-        self.position: PositionType = position
-        self.state: int = NOT_GENERATED
-        self.level: int = level
-        self.scale: int = 2 ** level
+    position: PositionType
+    state: int
+    level: int
+    scale: int
+    terrain: np.typing.NDArray[np.uint8]
+    mesh_data: ChunkMeshData
 
-        self.terrain: np.typing.NDArray[np.uint8] = np.zeros(CHUNK_DIMS, dtype=np.uint8)
-        self.mesh_data: ChunkMeshData = ChunkMeshData()
+    def __init__(self, position: PositionType, level: int = HIGHEST_LEVEL):
+        self.position = position
+        self.state = NOT_GENERATED
+        self.level = level
+        self.scale = 2 ** level
+
+        self.terrain = np.zeros(CHUNK_DIMS, dtype=np.uint8)
+        self.mesh_data = ChunkMeshData()
 
         logger.debug(f"New chunk created: {self.id_string}")
 
     @property
     def id_string(self) -> str:
-        return f"chunk_{self.position[0]}_{self.position[1]}_{self.position[2]}_{self.level}"
+        return (
+            "chunk_" +
+            f"{self.position[0]}_{self.position[1]}_{self.position[2]}" + 
+            f"_{self.level}"
+        )
 
     @property
     def center_pos(self) -> tuple[float, float, float]:
@@ -72,7 +93,8 @@ class Chunk:
         return (cx, cy, cz)
 
     def generate_terrain(self) -> None:
-        logger.debug(f"Chunk {self.id_string} Generating terrain (scale={self.scale})")
+        logger.debug("Chunk " + 
+            f"{self.id_string} Generating terrain (scale={self.scale})")
 
         start_x = (self.position[0] * CHUNK_SIDE - 1) * self.scale
         end_x   = ((self.position[0] + 1) * CHUNK_SIDE + 1) * self.scale
@@ -98,13 +120,16 @@ class Chunk:
 
         # todo maybe club these requests together across multiple chunks
         # i.e. let something like ChunkStorage handle them.
-        heights = perlin.genFromCoords(coords)[:n].reshape(CHUNK_SIDE + 2, CHUNK_SIDE + 2)
+        heights = perlin \
+            .genFromCoords(coords)[:n] \
+            .reshape(CHUNK_SIDE + 2, CHUNK_SIDE + 2)
         height_field = heights * 128
         Y = world_y.reshape(1, -1, 1)
         mask = Y < height_field[:, None, :]
 
         terrain = np.zeros_like(mask, dtype=np.uint8)
-        terrain[mask] = np.random.randint(1, 3, size=np.count_nonzero(mask), dtype=np.uint8)
+        terrain[mask] = np.random \
+            .randint(1, 3, size=np.count_nonzero(mask), dtype=np.uint8)
 
         self.terrain = terrain
         self.state = TERRAIN_GENERATED
@@ -128,7 +153,11 @@ class Chunk:
         scales = []
 
         for face, (dx, dy, dz) in FACES:
-            neighbor = terrain[1+dx:-1+dx or None, 1+dy:-1+dy or None, 1+dz:-1+dz or None]
+            neighbor = terrain[
+                (1 + dx):(-1 + dx) or None,
+                (1 + dy):(-1 + dy) or None,
+                (1 + dz):(-1 + dz) or None
+            ]
             visible_mask = solid & (neighbor == 0)
 
             if not np.any(visible_mask):
@@ -159,7 +188,19 @@ class Chunk:
         return True
 
 class OctreeNode:
-    def __init__(self, position: Position, storage: ChunkStorage, level: int = HIGHEST_LEVEL):
+    storage: ChunkStorage
+    position: Position
+    level: int
+    leaf: Chunk | None
+    is_split: bool
+    children: dict[str, OctreeNode]
+
+    def __init__(
+        self, 
+        position: Position,
+        storage: ChunkStorage,
+        level: int = HIGHEST_LEVEL
+    ) -> None:
         self.storage = storage
         self.position = position
         self.level = level
@@ -171,7 +212,10 @@ class OctreeNode:
 
     @property
     def id_string(self) -> str:
-        return f"octreenode_{self.position[0]}_{self.position[1]}_{self.position[2]}_{self.level}"
+        return ("octreenode_" + 
+            f"{self.position[0]}_{self.position[1]}_{self.position[2]}" + 
+            f"_{self.level}"
+        )
 
     def create_leaf(self):
         if self.leaf:
@@ -205,7 +249,11 @@ class OctreeNode:
                         self.position[2] * 2 + dz,
                     )
 
-                    child_node = OctreeNode(child_pos, self.storage, child_level)
+                    child_node = OctreeNode(
+                        child_pos, 
+                        self.storage,
+                        child_level
+                    )
                     self.children[child_node.id_string] = child_node
         
         self.is_split = True
@@ -250,6 +298,7 @@ class OctreeNode:
             return self.leaf.mesh_data
 
         data = ChunkMeshData()
+
         for child in self.children.values():
             data.append(child.get_mesh_data())
 

@@ -19,7 +19,10 @@ class World:
         if self.state.mesh_handler is not None:
             self.mesh: Mesh = self.state.mesh_handler.new_mesh("world")
         else:
-            raise RuntimeError("[terrain.world.World] tried to initialize world but the mesh handler wasn't registered")
+            raise RuntimeError(
+                "Tried to initialize World" + 
+                "but MeshHandler wasn't registered"
+            )
 
         logger.info("World instantiated.")
 
