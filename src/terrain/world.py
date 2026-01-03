@@ -1,14 +1,13 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
-
 import logging
+from core.mesh import Mesh
+from .chunk_handler import ChunkHandler
+
 logger = logging.getLogger(__name__) 
 
 if TYPE_CHECKING:
     from core.window import State
-
-from core.mesh import Mesh
-from .chunk_handler import ChunkHandler
 
 class World:
     def __init__(self, state: State) -> None:

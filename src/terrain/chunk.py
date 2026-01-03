@@ -1,13 +1,11 @@
 from __future__ import annotations
-
 import logging
-logger = logging.getLogger(__name__) 
+from multiprocessing import shared_memory as shm
 
 import pyfastnoisesimd as fns
 import numpy as np
 from typing import TypeAlias
 
-from type_hints import Position
 from constants import (
     NOT_GENERATED,
     CHUNK_DIMS,
@@ -16,10 +14,11 @@ from constants import (
     MESH_GENERATED,
     TERRAIN_GENERATED,
     FACES,
-    RENDER_DIST,
-    HEURISTIC
 )
 
+logger = logging.getLogger(__name__) 
+
+# TODO make this configurable or sth
 seed = np.random.randint(2**31)
 N_threads = 12
 perlin = fns.Noise(seed=seed, numWorkers=N_threads)
@@ -31,7 +30,9 @@ perlin.fractal.gain = 42
 perlin.perturb.perturbType = fns.PerturbType.NoPerturb
 
 PositionType: TypeAlias = tuple[int, int, int]
+ChunkDict: TypeAlias = dict[str, str | int | PositionType]
 
+# TODO why is this here
 BLOCKS = np.array([
     [0, 0, 0, 0, 0, 0],
     [0, 0, 0, 0, 0, 0],
@@ -39,23 +40,60 @@ BLOCKS = np.array([
 ], dtype=np.uint8)
 
 class ChunkMeshData:
+    position: np.ndarray
+    orientation: np.ndarray
+    tex_id: np.ndarray
+    scale: np.ndarray
+
     def __init__(self):
-        self.position: list[list[float]] = []
-        self.orientation: list[int] = []
-        self.tex_id: list[float] = []
-        self.scale: list[int] = []
+        self.clear()
 
     def clear(self):
-        self.position = []
-        self.orientation = []
-        self.tex_id = []
-        self.scale = []
+        self.position = np.array([])
+        self.orientation = np.array([])
+        self.tex_id = np.array([])
+        self.scale = np.array([])
 
-    def append(self, other: ChunkMeshData):
-        self.position.extend(other.position)
-        self.orientation.extend(other.orientation)
-        self.tex_id.extend(other.tex_id)
-        self.scale.extend(other.scale)
+    def concatenate(self, others: list[ChunkMeshData]):
+        self.position = np.concatenate(
+            (self.position, *(data.position for data in others)),
+            axis=0
+        )
+        self.orientation = np.concatenate(
+            (self.orientation, *(data.orientation for data in others)),
+            axis=0
+        )
+        self.tex_id = np.concatenate(
+            (self.tex_id, *(data.tex_id for data in others)),
+            axis=0
+        )
+        self.scale = np.concatenate(
+            (self.scale, *(data.scale for data in others)),
+            axis=0
+        )
+
+    def pack(self) -> np.ndarray:
+        return np.concatenate(
+            [self.position, self.orientation, self.tex_id, self.scale],
+            axis=None
+        )
+
+    @staticmethod
+    def unpack(packed_data: np.ndarray) -> ChunkMeshData:
+        mesh_data = ChunkMeshData()
+        if packed_data.size == 0:
+            return mesh_data
+        
+        total_size = packed_data.size
+        quarter_size = total_size // 4
+        
+        mesh_data.position = packed_data[:quarter_size].reshape(-1, 3)
+        mesh_data.orientation = packed_data[quarter_size:2*quarter_size]
+        mesh_data.tex_id = packed_data[2*quarter_size:3*quarter_size]
+        mesh_data.scale = packed_data[3*quarter_size:]
+        
+        return mesh_data
+
 
 class Chunk:
     position: PositionType
@@ -91,6 +129,57 @@ class Chunk:
         cy = (self.position[1] + 0.5) * side
         cz = (self.position[2] + 0.5) * side
         return (cx, cy, cz)
+
+    @staticmethod
+    def from_dict(data: ChunkDict) -> Chunk:
+        position, level = data["position"], data["level"]
+        chunk = Chunk(position, level)
+
+        if data["state"] == NOT_GENERATED:
+            return chunk
+
+        terrain_shm = shm.SharedMemory(data["terrain"])
+        terrain = np.ndarray(
+            (data["n_terrain"], ),
+            buffer=terrain_shm.buf
+        )
+        chunk.terrain = terrain
+        terrain_shm.close()
+
+        if data["state"] == TERRAIN_GENERATED:
+            return chunk
+
+        mesh_shm = shm.SharedMemory(data["mesh"])
+        packed_mesh = np.ndarray(
+            (data["n_mesh"], ),
+            buffer=mesh_shm.buf
+        )
+        mesh_data = ChunkMeshData.unpack(packed_mesh)
+        chunk.mesh_data = mesh_data
+        mesh_shm.close()
+
+        if data["state"] == MESH_GENERATED:
+            return chunk
+
+        raise Exception(f"Invalid chunk state: {data["state"]}")
+
+    def to_dict(
+        self, 
+        terrain: str,
+        n_terrain: int,
+        mesh: str,
+        n_mesh: int,
+    ) -> ChunkDict:
+        return {
+            "id": self.id_string,
+            "position": self.position,
+            "level": self.level,
+            "state": self.state,
+            "terrain": terrain,
+            "n_terrain": n_terrain,
+            "mesh": mesh,
+            "n_mesh": n_mesh,
+        }
 
     def generate_terrain(self) -> None:
         logger.debug("Chunk " + 
@@ -134,23 +223,23 @@ class Chunk:
         self.terrain = terrain
         self.state = TERRAIN_GENERATED
 
-    def generate_mesh(self) -> bool:
+    def generate_mesh(self):
         terrain = self.terrain
         self.mesh_data.clear()
 
         if not np.any(terrain):
             self.state = MESH_GENERATED
-            return False
+            return
 
         solid = terrain[1:-1, 1:-1, 1:-1] > 0
         if not np.any(solid):
             self.state = MESH_GENERATED
-            return False
+            return
 
-        positions = []
-        orientations = []
-        tex_ids = []
-        scales = []
+        positions: list[np.ndarray] = []
+        orientations: list[np.ndarray] = []
+        tex_ids: list[np.ndarray] = []
+        scales: list[np.ndarray] = []
 
         for face, (dx, dy, dz) in FACES:
             neighbor = terrain[
@@ -177,229 +266,13 @@ class Chunk:
 
         if not positions:
             self.state = MESH_GENERATED
-            return False
+            return
 
-        self.mesh_data.position = np.concatenate(positions).tolist()
-        self.mesh_data.orientation = np.concatenate(orientations).tolist()
-        self.mesh_data.tex_id = np.concatenate(tex_ids).tolist()
-        self.mesh_data.scale = np.concatenate(scales).tolist()
+        self.mesh_data.position = np.concatenate(positions)
+        self.mesh_data.orientation = np.concatenate(orientations)
+        self.mesh_data.tex_id = np.concatenate(tex_ids)
+        self.mesh_data.scale = np.concatenate(scales)
 
         self.state = MESH_GENERATED
-        return True
-
-class OctreeNode:
-    storage: ChunkStorage
-    position: Position
-    level: int
-    leaf: Chunk | None
-    is_split: bool
-    children: dict[str, OctreeNode]
-
-    def __init__(
-        self, 
-        position: Position,
-        storage: ChunkStorage,
-        level: int = HIGHEST_LEVEL
-    ) -> None:
-        self.storage = storage
-        self.position = position
-        self.level = level
-        self.leaf = None
-
-        self.is_split = False
-        self.children = {}
-        self.create_leaf()
-
-    @property
-    def id_string(self) -> str:
-        return ("octreenode_" + 
-            f"{self.position[0]}_{self.position[1]}_{self.position[2]}" + 
-            f"_{self.level}"
-        )
-
-    def create_leaf(self):
-        if self.leaf:
-            return
-        self.leaf = Chunk(self.position, self.level)
-        self.storage.chunks[self.leaf.id_string] = self.leaf
-        self.storage.build_queue.append(self.leaf.id_string)
-
-    def destroy_leaf(self):
-        if not self.leaf:
-            return
-        del self.storage.chunks[self.leaf.id_string]
-        del self.leaf
-        self.leaf = None
-
-    def split(self):
-        if self.level <= 0:
-            return
-
-        if self.is_split:
-            return
-
-        child_level = self.level - 1
-
-        for dx in (0, 1):
-            for dy in (0, 1):
-                for dz in (0, 1):
-                    child_pos = (
-                        self.position[0] * 2 + dx,
-                        self.position[1] * 2 + dy,
-                        self.position[2] * 2 + dz,
-                    )
-
-                    child_node = OctreeNode(
-                        child_pos, 
-                        self.storage,
-                        child_level
-                    )
-                    self.children[child_node.id_string] = child_node
-        
-        self.is_split = True
-
-    def unsplit(self):
-        self.is_split = False
-        # dont delete children for now, let them sleep
-        self.children = {}
-
-    def update(self, camera_position: Position):
-        for child in self.children.values():
-            child.update(camera_position)
-
-        scale = 2 ** self.level
-        side = CHUNK_SIDE * scale
-
-        center_x = (self.position[0] + 0.5) * side
-        center_y = (self.position[1] + 0.5) * side
-        center_z = (self.position[2] + 0.5) * side
-
-        cx, cy, cz = camera_position
-
-        distance = np.sqrt(
-            (center_x - cx) ** 2 +
-            (center_y - cy) ** 2 +
-            (center_z - cz) ** 2
-        )
-
-        factor = HEURISTIC[self.level]
-        split_threshold = side * factor
-        unsplit_threshold = side * (factor + 1)
-
-        if distance < split_threshold and self.level > 0:
-            if not self.is_split:
-                self.split()
-        elif distance > unsplit_threshold:
-            if self.is_split:
-                self.unsplit()
-
-    def get_mesh_data(self) -> ChunkMeshData:
-        if not self.is_split or self.level == 0:
-            return self.leaf.mesh_data
-
-        data = ChunkMeshData()
-
-        for child in self.children.values():
-            data.append(child.get_mesh_data())
-
-            if not child.leaf.state == MESH_GENERATED:
-                return self.leaf.mesh_data
-
-        return data
-
-    def dispose(self):
-        self.destroy_leaf()
-        for child in self.children.values():
-            child.dispose()
-
-    def __del__(self):
-        self.dispose()
-
-class ChunkStorage:
-    chunks: dict[Position, Chunk]
-    build_queue: list[str]
-    changed: bool
-
-    def __init__(self) -> None:
-        self.nodes = {}
-        self.chunks = {}
-        self.build_queue = []
-        self.camera_node = None
-        self.changed = False
-
-    def build_chunk(self, position: Position):
-        if position not in self.chunks:
-            return # might happen, completely normal
-
-        logger.debug(f"Building chunk {self.chunks[position].id_string}")
-        self.chunks[position].generate_terrain()
-        counts = self.chunks[position].generate_mesh()
-        self.changed = counts
-        return counts
-
-    def generate_mesh_data(self) -> tuple | None:
-        logger.debug(f"Generating unified mesh data")
-        final_data = ChunkMeshData()
-
-        for node in self.nodes.values():
-            data = node.get_mesh_data()
-            final_data.append(data)
-
-        try:
-            return ( # todo data.to_numpy() cvt directly to the struct thing.
-                np.array(final_data.position, dtype = np.float32),
-                np.array(final_data.orientation, dtype = np.float32),
-                np.array(final_data.tex_id, dtype = np.float32),
-                np.array(final_data.scale, dtype = np.float32)
-            )
-        except ValueError:
-            return None
-
-    def update(self, camera_position: Position):
-        self.changed = False
-        self.camera_node = tuple((camera_position[i] // CHUNK_SIDE) // (2 ** (HIGHEST_LEVEL)) for i in range(3))
-
-        if not self.nodes:
-            logger.warning("Loading initial terrain, this may take a while...")
-
-        required_nodes: set[Position] = set()
-        for x in range(-RENDER_DIST, RENDER_DIST + 1):
-            for y in range(-RENDER_DIST, RENDER_DIST + 1):
-                for z in range(-RENDER_DIST, RENDER_DIST + 1):
-                    translated_x = x + self.camera_node[0]
-                    translated_y = y + self.camera_node[1]
-                    translated_z = z + self.camera_node[2]
-                    required_nodes.add((
-                        translated_x, 
-                        translated_y, 
-                        translated_z
-                    ))
-
-        for required in required_nodes:
-            if required in self.nodes:
-                continue
-            node = OctreeNode(required, self, HIGHEST_LEVEL)
-            self.nodes[required] = node
-
-        to_delete: set[Position] = set(self.nodes.keys()) - required_nodes
-        for position in to_delete:
-            del self.nodes[position]
-
-        for node in self.nodes.values():
-            node.update(camera_position)
-
-        def distance_to_camera(chunk_id: str) -> float:
-            chunk = self.chunks.get(chunk_id)
-            if chunk is None:
-                return float('inf')
-            cx, cy, cz = chunk.center_pos
-            camx, camy, camz = camera_position
-            return np.sqrt((cx - camx)**2 + (cy - camy)**2 + (cz - camz)**2)
-
-        self.build_queue.sort(key=distance_to_camera)
-
-        while len(self.build_queue) > 0:
-            position = self.build_queue.pop(0)
-            self.build_chunk(position)
-            self.changed = True
+        return
 

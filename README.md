@@ -11,6 +11,7 @@ Meet Voxl, a highly optimized infinite procedural voxel terrain generating thing
 - LOD system
 
 ### Currently working on
+- Revert to normal chunking, make chunkgen use all cpu cores, then re-implement the octree.
 - Multiple block types
 - Stitching different LOD levels together (maybe by skirting higher levels at boundaries?)
 - Block shading (we need normals for this, but can use the "orientation" thing instead).
