@@ -1,3 +1,8 @@
+from enum import IntEnum
+from os import cpu_count
+
+N_WORKERS: int = max([4, cpu_count()])
+
 RENDER_DIST = 4
 HIGHEST_LEVEL = 12
 CHUNK_SIDE = 16
@@ -6,8 +11,6 @@ CHUNK_DIMS = tuple([
 ])  # Padding of 2 for neighbouring chunk data
 
 HEURISTIC = [max([12 - i, 4]) for i in range(HIGHEST_LEVEL + 2)]
-
-from enum import IntEnum
 
 class ChunkState(IntEnum):
     NOT_GENERATED = 0

@@ -4,12 +4,12 @@ from multiprocessing import shared_memory as shm
 
 import pyfastnoisesimd as fns
 import numpy as np
-from typing import TypeAlias
+from typing import TypeAlias, TypedDict
+from core.mesh import instance_dtype
 
 from constants import (
     CHUNK_DIMS,
     CHUNK_SIDE,
-    HIGHEST_LEVEL,
     FACES,
     ChunkState,
 )
@@ -17,7 +17,8 @@ from constants import (
 logger = logging.getLogger(__name__) 
 
 # TODO make this configurable or sth
-seed = np.random.randint(2**31)
+# seed = np.random.randint(2**31)
+seed = 42
 N_threads = 12
 perlin = fns.Noise(seed=seed, numWorkers=N_threads)
 perlin.frequency = 0.004
@@ -28,7 +29,16 @@ perlin.fractal.gain = 42
 perlin.perturb.perturbType = fns.PerturbType.NoPerturb
 
 PositionType: TypeAlias = tuple[int, int, int]
-ChunkDict: TypeAlias = dict[str, str | int | PositionType]
+
+class ChunkDict(TypedDict):
+    id: str
+    position: PositionType
+    level: int
+    state: ChunkState
+    terrain: str
+    n_terrain: int
+    mesh: str
+    n_mesh: int
 
 # TODO why is this here
 BLOCKS = np.array([
@@ -71,37 +81,47 @@ class ChunkMeshData:
         )
 
     def pack(self) -> np.ndarray:
-        return np.concatenate(
-            [self.position, self.orientation, self.tex_id, self.scale],
-            axis=None
-        )
+        if self.position.size == 0:
+            return np.empty(0, dtype=instance_dtype)
+
+        n = self.position.shape[0]
+        data = np.empty(n, dtype=instance_dtype)
+
+        data["position"] = self.position.astype(np.float32, copy=False)
+        data["orientation"] = self.orientation.astype(np.uint32, copy=False)
+        data["tex_id"] = self.tex_id.astype(np.float32, copy=False)
+        data["scale"] = self.scale.astype(np.uint32, copy=False)
+
+        return data
 
     @staticmethod
     def unpack(packed_data: np.ndarray) -> ChunkMeshData:
         mesh_data = ChunkMeshData()
+
         if packed_data.size == 0:
             return mesh_data
-        
-        total_size = packed_data.size
-        quarter_size = total_size // 4
-        
-        mesh_data.position = packed_data[:quarter_size].reshape(-1, 3)
-        mesh_data.orientation = packed_data[quarter_size:2*quarter_size]
-        mesh_data.tex_id = packed_data[2*quarter_size:3*quarter_size]
-        mesh_data.scale = packed_data[3*quarter_size:]
-        
-        return mesh_data
 
+        if packed_data.dtype != instance_dtype:
+            raise TypeError(
+                f"Invalid mesh dtype: {packed_data.dtype}, expected {instance_dtype}"
+            )
+
+        mesh_data.position = packed_data["position"]
+        mesh_data.orientation = packed_data["orientation"]
+        mesh_data.tex_id = packed_data["tex_id"]
+        mesh_data.scale = packed_data["scale"]
+
+        return mesh_data
 
 class Chunk:
     position: PositionType
-    state: int
+    state: ChunkState
     level: int
     scale: int
     terrain: np.typing.NDArray[np.uint8]
     mesh_data: ChunkMeshData
 
-    def __init__(self, position: PositionType, level: int = HIGHEST_LEVEL):
+    def __init__(self, position: PositionType, level: int = 0):
         self.position = position
         self.state = ChunkState.NOT_GENERATED
         self.level = level
@@ -150,7 +170,8 @@ class Chunk:
         mesh_shm = shm.SharedMemory(data["mesh"])
         packed_mesh = np.ndarray(
             (data["n_mesh"], ),
-            buffer=mesh_shm.buf
+            buffer=mesh_shm.buf,
+            dtype=instance_dtype
         )
         mesh_data = ChunkMeshData.unpack(packed_mesh)
         chunk.mesh_data = mesh_data
@@ -270,6 +291,8 @@ class Chunk:
         self.mesh_data.orientation = np.concatenate(orientations)
         self.mesh_data.tex_id = np.concatenate(tex_ids)
         self.mesh_data.scale = np.concatenate(scales)
+
+        print("B", self.mesh_data.tex_id)
 
         self.state = ChunkState.MESH_GENERATED
         return

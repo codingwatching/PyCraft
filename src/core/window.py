@@ -1,9 +1,8 @@
 from __future__ import annotations
+from time import sleep
 from typing import Any
 from time import perf_counter_ns
 import logging
-logger = logging.getLogger(__name__) 
-
 import glfw
 from OpenGL.GL import GL_TRUE, glEnable, GL_MULTISAMPLE, glViewport
 
@@ -13,6 +12,9 @@ from .asset_manager import AssetManager
 from .mesh import MeshHandler
 from .camera import Camera
 from player import Player
+
+logger = logging.getLogger(__name__) 
+
 
 class State:
     def __init__(self, window: Window) -> None:
@@ -79,6 +81,7 @@ class Window:
 
         while not glfw.window_should_close(self.window):
             width, height = self.size
+            sleep(1/10)
             glViewport(0, 0, width, height)
 
             if self.state.player is not None:
