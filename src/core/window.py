@@ -81,7 +81,7 @@ class Window:
 
         while not glfw.window_should_close(self.window):
             width, height = self.size
-            sleep(1/10)
+            sleep(1/60)
             glViewport(0, 0, width, height)
 
             if self.state.player is not None:

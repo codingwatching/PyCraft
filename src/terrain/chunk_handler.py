@@ -1,10 +1,11 @@
 import logging
 import numpy as np
 import multiprocessing
+import random
 from multiprocessing.managers import SyncManager
 from multiprocessing import shared_memory as shm
+from time import sleep
 
-from numpy._core.multiarray import dtype
 from .chunk import Chunk, ChunkMeshData
 from constants import ChunkState
 from core.utils import deallocate_shared_memory
@@ -178,6 +179,7 @@ class ChunkHandler:
 
         while namespace.alive:
             builder.step(namespace, pid)
+            sleep(1/100)
 
     def mesh_worker(self, namespace) -> None:
         logger.info(f"Starting mesh worker")
@@ -185,15 +187,20 @@ class ChunkHandler:
 
         while namespace.alive:
             mesher.step(namespace)
+            sleep(1/100)
 
     def world_worker(self, namespace) -> None:
         logger.info("Starting world worker")
         
-        # Create a singular chunk at origin
-        origin_chunk = Chunk((0, 0, 0))
-        chunk_data = origin_chunk.to_dict("", 0, "", 0)
-        namespace.chunks[origin_chunk.id_string] = chunk_data
-        namespace.queues[1].append(origin_chunk.id_string)
+        a = 4
+        for x in range(-a, a):
+            for y in range(-a, a):
+                for z in range(-a, a):
+                    chunk = Chunk((x, y, z))
+                    chunk_data = chunk.to_dict("", 0, "", 0)
+                    namespace.chunks[chunk.id_string] = chunk_data
+                    worker_id = random.choice(list(namespace.queues.keys()))
+                    namespace.queues[worker_id].append(chunk.id_string)
         
         while namespace.alive:
             pass
@@ -203,11 +210,6 @@ class ChunkHandler:
 
         self.namespace.alive = False
         
-        # Terminate worker processes
-        for process in self.processes:
-            process.terminate()
-            process.join()
-        
         # Deallocate shared memory
         deallocate_shared_memory(self.namespace.mesh_shm)
         
@@ -215,4 +217,9 @@ class ChunkHandler:
         for chunk_id, chunk_data in self.namespace.chunks.items():
             deallocate_shared_memory(chunk_data.get("terrain"))
             deallocate_shared_memory(chunk_data.get("mesh"))
+        
+        # Terminate worker processes
+        for process in self.processes:
+            process.terminate()
+            process.join()
 

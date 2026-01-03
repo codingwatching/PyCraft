@@ -11,7 +11,9 @@ def deallocate_shared_memory(name: str) -> None:
     """
     if name is None:
         return
-        
+    if name == "":
+        return
+
     try:
         memory = shm.SharedMemory(name)
         memory.close()
@@ -19,5 +21,3 @@ def deallocate_shared_memory(name: str) -> None:
         logger.debug(f"Deallocated shared memory: {name}")
     except FileNotFoundError:
         logger.debug(f"Shared memory {name} not found, skipping deallocation")
-    except Exception as e:
-        logger.warning(f"Failed to deallocate shared memory {name}: {e}")
