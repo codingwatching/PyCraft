@@ -17,8 +17,7 @@ from constants import (
 logger = logging.getLogger(__name__) 
 
 # TODO make this configurable or sth
-# seed = np.random.randint(2**31)
-seed = 42
+seed = np.random.randint(2**31)
 N_threads = 12
 perlin = fns.Noise(seed=seed, numWorkers=N_threads)
 perlin.frequency = 0.004
@@ -63,22 +62,30 @@ class ChunkMeshData:
         self.scale = np.array([])
 
     def concatenate(self, others: list[ChunkMeshData]):
-        self.position = np.concatenate(
-            (self.position, *(data.position for data in others)),
-            axis=0
-        )
-        self.orientation = np.concatenate(
-            (self.orientation, *(data.orientation for data in others)),
-            axis=0
-        )
-        self.tex_id = np.concatenate(
-            (self.tex_id, *(data.tex_id for data in others)),
-            axis=0
-        )
-        self.scale = np.concatenate(
-            (self.scale, *(data.scale for data in others)),
-            axis=0
-        )
+        if self.position.size == 0:
+            all_data = [data for data in others if data.position.size > 0]
+            if all_data:
+                self.position = np.concatenate([data.position for data in all_data], axis=0)
+                self.orientation = np.concatenate([data.orientation for data in all_data], axis=0)
+                self.tex_id = np.concatenate([data.tex_id for data in all_data], axis=0)
+                self.scale = np.concatenate([data.scale for data in all_data], axis=0)
+        else:
+            self.position = np.concatenate(
+                (self.position, *(data.position for data in others if data.position.size > 0)),
+                axis=0
+            )
+            self.orientation = np.concatenate(
+                (self.orientation, *(data.orientation for data in others if data.orientation.size > 0)),
+                axis=0
+            )
+            self.tex_id = np.concatenate(
+                (self.tex_id, *(data.tex_id for data in others if data.tex_id.size > 0)),
+                axis=0
+            )
+            self.scale = np.concatenate(
+                (self.scale, *(data.scale for data in others if data.scale.size > 0)),
+                axis=0
+            )
 
     def pack(self) -> np.ndarray:
         if self.position.size == 0:
@@ -106,10 +113,10 @@ class ChunkMeshData:
                 f"Invalid mesh dtype: {packed_data.dtype}, expected {instance_dtype}"
             )
 
-        mesh_data.position = packed_data["position"]
-        mesh_data.orientation = packed_data["orientation"]
-        mesh_data.tex_id = packed_data["tex_id"]
-        mesh_data.scale = packed_data["scale"]
+        mesh_data.position = packed_data["position"].astype(np.float32, copy=False)
+        mesh_data.orientation = packed_data["orientation"].astype(np.uint32, copy=False)
+        mesh_data.tex_id = packed_data["tex_id"].astype(np.float32, copy=False)
+        mesh_data.scale = packed_data["scale"].astype(np.uint32, copy=False)
 
         return mesh_data
 
@@ -291,8 +298,6 @@ class Chunk:
         self.mesh_data.orientation = np.concatenate(orientations)
         self.mesh_data.tex_id = np.concatenate(tex_ids)
         self.mesh_data.scale = np.concatenate(scales)
-
-        print("B", self.mesh_data.tex_id)
 
         self.state = ChunkState.MESH_GENERATED
         return

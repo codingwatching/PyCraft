@@ -35,20 +35,15 @@ class World:
             camera_position = list(self.state.camera.position)
         self.handler.set_camera_position(camera_position)
 
-        if self.last_mesh == self.handler.mesh_data:
-            return
-
         shm_name, length = self.handler.mesh_data
-        self.last_mesh = shm_name
-        
-        if shm_name is None:
+        if self.last_mesh == shm_name:
             return
+        self.last_mesh = shm_name
             
         try:
             existing_shm = shm.SharedMemory(name=shm_name)
             packed_data = np.ndarray((length, ), dtype=instance_dtype, buffer=existing_shm.buf)
             mesh_data = ChunkMeshData.unpack(packed_data)
-            print(mesh_data.tex_id)
             
             self.mesh.set_data(
                 mesh_data.position.astype(np.float32),

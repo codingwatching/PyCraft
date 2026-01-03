@@ -44,6 +44,20 @@ class ChunkBuilder:
             size=mesh_data.nbytes,
         )
 
+        mesh_array = np.ndarray(
+            mesh_data.shape,
+            dtype=instance_dtype,
+            buffer=mesh.buf
+        )
+        mesh_array[:] = mesh_data
+
+        terrain_array = np.ndarray(
+            chunk.terrain.shape,
+            dtype=chunk.terrain.dtype,
+            buffer=terrain.buf
+        )
+        terrain_array[:] = chunk.terrain
+
         newdata = chunk.to_dict(
             terrain.name,
             len(chunk.terrain),
@@ -57,10 +71,9 @@ class MeshBuilder:
         return
 
     def step(self, namespace) -> None:
-        # if not namespace.terrain_changed:
-        # return
-
-        print("asdf")
+        if not namespace.terrain_changed:
+            return
+        namespace.terrain_changed = False
 
         combined_mesh = ChunkMeshData()
         chunk_meshes = []
@@ -73,8 +86,8 @@ class MeshBuilder:
                     buffer=mesh_shm.buf,
                     dtype=instance_dtype
                 )
+                packed_mesh = packed_mesh.copy()
                 mesh_data = ChunkMeshData.unpack(packed_mesh)
-                print("M", mesh_data.tex_id)
                 chunk_meshes.append(mesh_data)
                 mesh_shm.close()
 
@@ -102,7 +115,6 @@ class MeshBuilder:
 
         namespace.mesh_shm = new_mesh_shm.name
         namespace.mesh_len = len(new_mesh_array)
-        namespace.terrain_changed = False
 
 class ChunkHandler:
     manager: SyncManager
@@ -181,10 +193,7 @@ class ChunkHandler:
         origin_chunk = Chunk((0, 0, 0))
         chunk_data = origin_chunk.to_dict("", 0, "", 0)
         namespace.chunks[origin_chunk.id_string] = chunk_data
-        
-        # Add to the first worker's queue for processing
-        if 0 in namespace.queues:
-            namespace.queues[0].append(origin_chunk.id_string)
+        namespace.queues[1].append(origin_chunk.id_string)
         
         while namespace.alive:
             pass
