@@ -7,13 +7,11 @@ import numpy as np
 from typing import TypeAlias
 
 from constants import (
-    NOT_GENERATED,
     CHUNK_DIMS,
     CHUNK_SIDE,
     HIGHEST_LEVEL,
-    MESH_GENERATED,
-    TERRAIN_GENERATED,
     FACES,
+    ChunkState,
 )
 
 logger = logging.getLogger(__name__) 
@@ -105,7 +103,7 @@ class Chunk:
 
     def __init__(self, position: PositionType, level: int = HIGHEST_LEVEL):
         self.position = position
-        self.state = NOT_GENERATED
+        self.state = ChunkState.NOT_GENERATED
         self.level = level
         self.scale = 2 ** level
 
@@ -135,7 +133,7 @@ class Chunk:
         position, level = data["position"], data["level"]
         chunk = Chunk(position, level)
 
-        if data["state"] == NOT_GENERATED:
+        if data["state"] == ChunkState.NOT_GENERATED:
             return chunk
 
         terrain_shm = shm.SharedMemory(data["terrain"])
@@ -146,7 +144,7 @@ class Chunk:
         chunk.terrain = terrain
         terrain_shm.close()
 
-        if data["state"] == TERRAIN_GENERATED:
+        if data["state"] == ChunkState.TERRAIN_GENERATED:
             return chunk
 
         mesh_shm = shm.SharedMemory(data["mesh"])
@@ -158,7 +156,7 @@ class Chunk:
         chunk.mesh_data = mesh_data
         mesh_shm.close()
 
-        if data["state"] == MESH_GENERATED:
+        if data["state"] == ChunkState.MESH_GENERATED:
             return chunk
 
         raise Exception(f"Invalid chunk state: {data["state"]}")
@@ -221,19 +219,19 @@ class Chunk:
             .randint(1, 3, size=np.count_nonzero(mask), dtype=np.uint8)
 
         self.terrain = terrain
-        self.state = TERRAIN_GENERATED
+        self.state = ChunkState.TERRAIN_GENERATED
 
     def generate_mesh(self):
         terrain = self.terrain
         self.mesh_data.clear()
 
         if not np.any(terrain):
-            self.state = MESH_GENERATED
+            self.state = ChunkState.MESH_GENERATED
             return
 
         solid = terrain[1:-1, 1:-1, 1:-1] > 0
         if not np.any(solid):
-            self.state = MESH_GENERATED
+            self.state = ChunkState.MESH_GENERATED
             return
 
         positions: list[np.ndarray] = []
@@ -265,7 +263,7 @@ class Chunk:
             scales.append(np.full(vx.shape[0], self.scale, np.uint32))
 
         if not positions:
-            self.state = MESH_GENERATED
+            self.state = ChunkState.MESH_GENERATED
             return
 
         self.mesh_data.position = np.concatenate(positions)
@@ -273,6 +271,6 @@ class Chunk:
         self.mesh_data.tex_id = np.concatenate(tex_ids)
         self.mesh_data.scale = np.concatenate(scales)
 
-        self.state = MESH_GENERATED
+        self.state = ChunkState.MESH_GENERATED
         return
 

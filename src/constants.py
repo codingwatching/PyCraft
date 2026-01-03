@@ -7,10 +7,12 @@ CHUNK_DIMS = tuple([
 
 HEURISTIC = [max([12 - i, 4]) for i in range(HIGHEST_LEVEL + 2)]
 
-# TODO: Use enums instead of whatever this is
-NOT_GENERATED = 0
-TERRAIN_GENERATED = 1
-MESH_GENERATED = 2
+from enum import IntEnum
+
+class ChunkState(IntEnum):
+    NOT_GENERATED = 0
+    TERRAIN_GENERATED = 1
+    MESH_GENERATED = 2
 
 FRONT  = 0
 BACK   = 1
