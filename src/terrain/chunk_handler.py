@@ -31,7 +31,7 @@ class ChunkBuilder:
         chunk.generate_mesh()
         mesh_data = chunk.mesh_data.pack()
 
-        logger.info(f"Worker {pid} generated {chunk.id_string}")
+        logger.debug(f"Worker {pid} generated {chunk.id_string}")
         namespace.terrain_changed = True
 
         if len(mesh_data) == 0:
@@ -176,23 +176,23 @@ class ChunkHandler:
         self.namespace.camera = position
 
     def build_worker(self, namespace, pid: int) -> None:
-        logger.info(f"Starting build worker {pid}")
+        logger.debug(f"Starting build worker {pid}")
         builder = ChunkBuilder()
 
         while namespace.alive:
             builder.step(namespace, pid)
 
     def mesh_worker(self, namespace) -> None:
-        logger.info(f"Starting mesh worker")
+        logger.debug(f"Starting mesh worker")
         mesher = MeshBuilder()
 
         while namespace.alive:
             mesher.step(namespace)
 
     def world_worker(self, namespace) -> None:
-        logger.info("Starting world worker")
+        logger.debug("Starting world worker")
         
-        a = 4
+        a = 3
         for x in range(-a, a):
             for y in range(-a, a):
                 for z in range(-a, a):
@@ -208,8 +208,6 @@ class ChunkHandler:
     def kill(self) -> None:
         logger.info("Terminating workers")
 
-        self.namespace.alive = False
-        
         # Deallocate shared memory
         deallocate_shared_memory(self.namespace.mesh_shm)
         
@@ -218,6 +216,8 @@ class ChunkHandler:
             deallocate_shared_memory(chunk_data.get("terrain"))
             deallocate_shared_memory(chunk_data.get("mesh"))
         
+        self.namespace.alive = False
+
         # Terminate worker processes
         for process in self.processes:
             process.terminate()
