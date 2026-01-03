@@ -20,19 +20,21 @@ class ChunkBuilder:
 
     def step(self, namespace, pid: int) -> None:
         queue = namespace.queues[pid]
+        
         if len(queue) == 0:
             sleep(0.1)
             return
         
-        entry = queue.pop(0)
+        entry = queue.pop(random.randint(0, len(queue) - 1))
         data = namespace.chunks[entry]
+        
+        # Process chunk locally
         chunk = Chunk.from_dict(data)
         chunk.generate_terrain()
         chunk.generate_mesh()
         mesh_data = chunk.mesh_data.pack()
 
         logger.debug(f"Worker {pid} generated {chunk.id_string}")
-        namespace.terrain_changed = True
 
         if len(mesh_data) == 0:
             return
@@ -46,19 +48,21 @@ class ChunkBuilder:
             size=mesh_data.nbytes,
         )
 
-        mesh_array = np.ndarray(
-            mesh_data.shape,
-            dtype=instance_dtype,
-            buffer=mesh.buf
-        )
-        mesh_array[:] = mesh_data
-
         terrain_array = np.ndarray(
             chunk.terrain.shape,
             dtype=chunk.terrain.dtype,
             buffer=terrain.buf
         )
         terrain_array[:] = chunk.terrain
+        terrain.close()
+
+        mesh_array = np.ndarray(
+            mesh_data.shape,
+            dtype=instance_dtype,
+            buffer=mesh.buf
+        )
+        mesh_array[:] = mesh_data
+        mesh.close()
 
         newdata = chunk.to_dict(
             terrain.name,
@@ -66,25 +70,31 @@ class ChunkBuilder:
             mesh.name,
             len(mesh_data),
         )
+        
         namespace.chunks[entry] = newdata
+        namespace.terrain_changed = True
 
-        terrain.close()
-        mesh.close()
 
 class MeshBuilder:
     def __init__(self) -> None:
         return
 
     def step(self, namespace) -> None:
-        if not namespace.terrain_changed:
+        terrain_changed = namespace.terrain_changed
+        current_mesh_shm = namespace.mesh_shm
+        
+        if not terrain_changed:
             sleep(0.1)
             return
+        
         namespace.terrain_changed = False
 
         combined_mesh = ChunkMeshData()
         chunk_meshes = []
+        
+        chunks_items = list(namespace.chunks.items())
 
-        for chunk_id, chunk_data in namespace.chunks.items():
+        for chunk_id, chunk_data in chunks_items:
             if chunk_data["state"] == ChunkState.MESH_GENERATED:
                 mesh_shm = shm.SharedMemory(chunk_data["mesh"])
                 packed_mesh = np.ndarray(
@@ -102,7 +112,7 @@ class MeshBuilder:
 
         combined_packed = combined_mesh.pack()
 
-        deallocate_shared_memory(namespace.mesh_shm)
+        deallocate_shared_memory(current_mesh_shm)
 
         if len(combined_packed) == 0:
             return
@@ -210,7 +220,7 @@ class ChunkHandler:
         for name in queuenames:
             queues[name] = []
         
-        a = 8
+        a = 5
         for x in range(-a, a):
             for y in range(-a, a):
                 for z in range(-a, a):
