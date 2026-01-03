@@ -94,6 +94,8 @@ class Window:
 
         logger.info("Terminated!")
         self.state.on_close()
+        if self.state.world is not None:
+            self.state.world.on_close()
         while self.state.shared_context_alive:
             pass
         glfw.terminate()

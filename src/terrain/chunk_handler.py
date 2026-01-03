@@ -21,7 +21,7 @@ class ChunkBuilder:
     def step(self, namespace, pid: int) -> None:
         queue = namespace.queues[pid]
         if len(queue) == 0:
-            sleep(0.01)
+            sleep(0.1)
             return
         
         entry = queue.pop(0)
@@ -77,7 +77,7 @@ class MeshBuilder:
 
     def step(self, namespace) -> None:
         if not namespace.terrain_changed:
-            sleep(0.01)
+            sleep(0.1)
             return
         namespace.terrain_changed = False
 
@@ -146,7 +146,7 @@ class ChunkHandler:
 
         self.processes = []
         
-        for pid in range(N_WORKERS):
+        for pid in range(N_WORKERS - 2):
             builder = multiprocessing.Process(
                 target=self.build_worker,
                 args=(self.namespace, pid)
@@ -182,28 +182,46 @@ class ChunkHandler:
         logger.debug(f"Starting build worker {pid}")
         builder = ChunkBuilder()
 
-        while namespace.alive:
-            builder.step(namespace, pid)
+        try:
+            while namespace.alive:
+                builder.step(namespace, pid)
+        finally:
+            # Clean up any remaining shared memory in this process
+            import gc
+            gc.collect()
 
     def mesh_worker(self, namespace) -> None:
         logger.debug(f"Starting mesh worker")
         mesher = MeshBuilder()
 
-        while namespace.alive:
-            mesher.step(namespace)
+        try:
+            while namespace.alive:
+                mesher.step(namespace)
+        finally:
+            # Clean up any remaining shared memory in this process
+            import gc
+            gc.collect()
 
     def world_worker(self, namespace) -> None:
         logger.debug("Starting world worker")
+
+        queues = {}
+        queuenames = list(namespace.queues.keys())
+        for name in queuenames:
+            queues[name] = []
         
-        a = 3
+        a = 8
         for x in range(-a, a):
             for y in range(-a, a):
                 for z in range(-a, a):
                     chunk = Chunk((x, y, z))
                     chunk_data = chunk.to_dict("", 0, "", 0)
                     namespace.chunks[chunk.id_string] = chunk_data
-                    worker_id = random.choice(list(namespace.queues.keys()))
-                    namespace.queues[worker_id].append(chunk.id_string)
+                    worker_id = random.choice(queuenames)
+                    queues[worker_id].append(chunk.id_string)
+
+        for name in queuenames:
+            namespace.queues[name].extend(queues[name])
         
         while namespace.alive:
             pass
@@ -211,18 +229,23 @@ class ChunkHandler:
     def kill(self) -> None:
         logger.info("Terminating workers")
 
-        # Deallocate shared memory
+        # Signal workers to stop
+        self.namespace.alive = False
+        
+        # Give workers time to finish current work and clean up
+        sleep(0.1)
+        
+        # Wait for processes to exit naturally
+        for process in self.processes:
+            process.join()
+            
+        # Clean up manager to prevent resource tracker warnings
+        self.manager.shutdown()
+        
+        # Deallocate any remaining shared memory
         deallocate_shared_memory(self.namespace.mesh_shm)
         
-        # Deallocate terrain and mesh shared memory for all chunks
         for chunk_id, chunk_data in self.namespace.chunks.items():
             deallocate_shared_memory(chunk_data.get("terrain"))
             deallocate_shared_memory(chunk_data.get("mesh"))
-        
-        self.namespace.alive = False
-
-        # Terminate worker processes
-        for process in self.processes:
-            process.terminate()
-            process.join()
 
