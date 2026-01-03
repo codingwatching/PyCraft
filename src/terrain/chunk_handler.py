@@ -21,6 +21,7 @@ class ChunkBuilder:
     def step(self, namespace, pid: int) -> None:
         queue = namespace.queues[pid]
         if len(queue) == 0:
+            sleep(0.01)
             return
         
         entry = queue.pop(0)
@@ -73,6 +74,7 @@ class MeshBuilder:
 
     def step(self, namespace) -> None:
         if not namespace.terrain_changed:
+            sleep(0.01)
             return
         namespace.terrain_changed = False
 
@@ -141,7 +143,7 @@ class ChunkHandler:
 
         self.processes = []
         
-        for pid in range(N_WORKERS - 2):
+        for pid in range(N_WORKERS):
             builder = multiprocessing.Process(
                 target=self.build_worker,
                 args=(self.namespace, pid)
@@ -179,7 +181,6 @@ class ChunkHandler:
 
         while namespace.alive:
             builder.step(namespace, pid)
-            sleep(1/100)
 
     def mesh_worker(self, namespace) -> None:
         logger.info(f"Starting mesh worker")
@@ -187,7 +188,6 @@ class ChunkHandler:
 
         while namespace.alive:
             mesher.step(namespace)
-            sleep(1/100)
 
     def world_worker(self, namespace) -> None:
         logger.info("Starting world worker")
