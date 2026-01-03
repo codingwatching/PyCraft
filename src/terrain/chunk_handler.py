@@ -68,6 +68,9 @@ class ChunkBuilder:
         )
         namespace.chunks[entry] = newdata
 
+        terrain.close()
+        mesh.close()
+
 class MeshBuilder:
     def __init__(self) -> None:
         return
