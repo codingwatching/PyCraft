@@ -81,6 +81,8 @@ class Player:
         if glfw.get_key(self.state.window.window, glfw.KEY_LEFT_SHIFT) == glfw.PRESS:
             self.state_map["velocity"][1] += sens
 
+
+
         self.state_map["position"][0] += self.state_map["velocity"][0]
         self.state_map["position"][1] += self.state_map["velocity"][1]
         self.state_map["position"][2] += self.state_map["velocity"][2]

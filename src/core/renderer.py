@@ -13,7 +13,10 @@ from OpenGL.GL import (
     GL_DEPTH_CLAMP,
     GL_DEPTH_TEST,
     GL_FALSE,
+    GL_FILL,
+    GL_FRONT_AND_BACK,
     GL_LESS,
+    GL_LINE,
     glBindVertexArray,
     glClear,
     glClearColor,
@@ -25,6 +28,7 @@ from OpenGL.GL import (
     glGetUniformLocation,
     glUniform3f,
     glUniformMatrix4fv,
+    glPolygonMode,
 )
 
 try:
@@ -97,6 +101,11 @@ class Renderer:
         glFrontFace(GL_CCW)
 
         glEnable(GL_DEPTH_CLAMP)
+
+        if self.state.wireframe:
+            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
+        else:
+            glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
 
         if self.state.player is not None:
             self.state.player.drawcall()

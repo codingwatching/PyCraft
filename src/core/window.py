@@ -31,6 +31,7 @@ class State:
         self.last_frame_time: int = perf_counter_ns()
         self.fps: float = 0.0
         self.dt: float = 0.0
+        self.wireframe: bool = False
 
     def on_drawcall(self) -> None:
         now: int = perf_counter_ns()
@@ -73,6 +74,9 @@ class Window:
         self.state: State = State(self)
         self.renderer: Renderer = Renderer(self.state)
         self.world: World = World(self.state)
+        
+        # Set up key callback
+        glfw.set_key_callback(self.window, self._key_callback)
 
         logger.info("Window instantiated.")
 
@@ -99,6 +103,10 @@ class Window:
         while self.state.shared_context_alive:
             pass
         glfw.terminate()
+
+    def _key_callback(self, window, key, scancode, action, mods):
+        if key == glfw.KEY_M and action == glfw.PRESS:
+            self.state.wireframe = not self.state.wireframe
 
     @property
     def size(self) -> tuple[int, int]:
