@@ -49,7 +49,8 @@ class World:
                 mesh_data.position.astype(np.float32),
                 mesh_data.orientation.astype(np.float32),
                 mesh_data.tex_id.astype(np.float32),
-                mesh_data.scale.astype(np.float32)
+                mesh_data.width.astype(np.float32),
+                mesh_data.height.astype(np.float32)
             )
             
             existing_shm.close()

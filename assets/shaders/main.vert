@@ -3,7 +3,8 @@
 layout(location = 0) in vec3 position;
 layout(location = 1) in float orientation;
 layout(location = 2) in float tex_id;
-layout(location = 3) in int scale_multiplier;
+layout(location = 3) in float width;
+layout(location = 4) in float height;
 
 out vec3 v_pos;
 flat out float v_tex_index;
@@ -77,14 +78,21 @@ void main() {
     int vert_id = gl_VertexID % 6; // vertex within face
     int idx = face * 6 + vert_id;  // final vertex index
 
-    vec3 local_pos = cubeVertex(idx) * scale_multiplier;  // apply scale
+    vec3 scaled_vertex = cubeVertex(idx);
+    scaled_vertex.x *= width;
+    scaled_vertex.y *= height;
+    scaled_vertex.z *= width;
+    vec3 local_pos = scaled_vertex;  // apply width/height scale
     vec3 world_pos = position + local_pos;
 
     gl_Position = projection * view * vec4(world_pos, 1.0);
 
     v_pos = local_pos;
     v_tex_index = tex_id;
-    v_uv = cubeUV(idx) * scale_multiplier;
+    vec2 scaled_uv = cubeUV(idx);
+    scaled_uv.x *= width;
+    scaled_uv.y *= height;
+    v_uv = scaled_uv;
 
     // fog distance (camera space z)
     v_fog_distance = length((view * vec4(world_pos, 1.0)).xyz);

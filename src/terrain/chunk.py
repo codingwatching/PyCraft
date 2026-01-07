@@ -50,7 +50,8 @@ class ChunkMeshData:
     position: np.ndarray
     orientation: np.ndarray
     tex_id: np.ndarray
-    scale: np.ndarray
+    width: np.ndarray
+    height: np.ndarray
 
     def __init__(self):
         self.clear()
@@ -59,7 +60,8 @@ class ChunkMeshData:
         self.position = np.array([])
         self.orientation = np.array([])
         self.tex_id = np.array([])
-        self.scale = np.array([])
+        self.width = np.array([])
+        self.height = np.array([])
 
     def concatenate(self, others: list[ChunkMeshData]):
         if self.position.size == 0:
@@ -68,7 +70,8 @@ class ChunkMeshData:
                 self.position = np.concatenate([data.position for data in all_data], axis=0)
                 self.orientation = np.concatenate([data.orientation for data in all_data], axis=0)
                 self.tex_id = np.concatenate([data.tex_id for data in all_data], axis=0)
-                self.scale = np.concatenate([data.scale for data in all_data], axis=0)
+                self.width = np.concatenate([data.width for data in all_data], axis=0)
+                self.height = np.concatenate([data.height for data in all_data], axis=0)
         else:
             self.position = np.concatenate(
                 (self.position, *(data.position for data in others if data.position.size > 0)),
@@ -82,8 +85,12 @@ class ChunkMeshData:
                 (self.tex_id, *(data.tex_id for data in others if data.tex_id.size > 0)),
                 axis=0
             )
-            self.scale = np.concatenate(
-                (self.scale, *(data.scale for data in others if data.scale.size > 0)),
+            self.width = np.concatenate(
+                (self.width, *(data.width for data in others if data.width.size > 0)),
+                axis=0
+            )
+            self.height = np.concatenate(
+                (self.height, *(data.height for data in others if data.height.size > 0)),
                 axis=0
             )
 
@@ -97,7 +104,8 @@ class ChunkMeshData:
         data["position"] = self.position.astype(np.float32, copy=False)
         data["orientation"] = self.orientation.astype(np.uint32, copy=False)
         data["tex_id"] = self.tex_id.astype(np.float32, copy=False)
-        data["scale"] = self.scale.astype(np.uint32, copy=False)
+        data["width"] = self.width.astype(np.float32, copy=False)
+        data["height"] = self.height.astype(np.float32, copy=False)
 
         return data
 
@@ -116,7 +124,8 @@ class ChunkMeshData:
         mesh_data.position = packed_data["position"].astype(np.float32, copy=False)
         mesh_data.orientation = packed_data["orientation"].astype(np.uint32, copy=False)
         mesh_data.tex_id = packed_data["tex_id"].astype(np.float32, copy=False)
-        mesh_data.scale = packed_data["scale"].astype(np.uint32, copy=False)
+        mesh_data.width = packed_data["width"].astype(np.float32, copy=False)
+        mesh_data.height = packed_data["height"].astype(np.float32, copy=False)
 
         return mesh_data
 
@@ -124,7 +133,8 @@ class Chunk:
     position: PositionType
     state: ChunkState
     level: int
-    scale: int
+    width: float
+    height: float
     terrain: np.typing.NDArray[np.uint8]
     mesh_data: ChunkMeshData
 
@@ -132,7 +142,9 @@ class Chunk:
         self.position = position
         self.state = ChunkState.NOT_GENERATED
         self.level = level
-        self.scale = 2 ** level
+        scale_value = 2 ** level
+        self.width = float(scale_value)
+        self.height = float(scale_value)
 
         self.terrain = np.zeros(CHUNK_DIMS, dtype=np.uint8)
         self.mesh_data = ChunkMeshData()
@@ -149,7 +161,7 @@ class Chunk:
 
     @property
     def center_pos(self) -> tuple[float, float, float]:
-        side = CHUNK_SIDE * self.scale
+        side = CHUNK_SIDE * self.width
         cx = (self.position[0] + 0.5) * side
         cy = (self.position[1] + 0.5) * side
         cz = (self.position[2] + 0.5) * side
@@ -209,18 +221,18 @@ class Chunk:
 
     def generate_terrain(self) -> None:
         logger.debug("Chunk " + 
-            f"{self.id_string} Generating terrain (scale={self.scale})")
+            f"{self.id_string} Generating terrain (width={self.width}, height={self.height})")
 
-        start_x = (self.position[0] * CHUNK_SIDE - 1) * self.scale
-        end_x   = ((self.position[0] + 1) * CHUNK_SIDE + 1) * self.scale
+        start_x = (self.position[0] * CHUNK_SIDE - 1) * self.width
+        end_x   = ((self.position[0] + 1) * CHUNK_SIDE + 1) * self.width
         world_x = np.linspace(start_x, end_x, CHUNK_DIMS[0])
 
-        start_y = (self.position[1] * CHUNK_SIDE - 1) * self.scale
-        end_y   = ((self.position[1] + 1) * CHUNK_SIDE + 1) * self.scale
+        start_y = (self.position[1] * CHUNK_SIDE - 1) * self.height
+        end_y   = ((self.position[1] + 1) * CHUNK_SIDE + 1) * self.height
         world_y = np.linspace(start_y, end_y, CHUNK_DIMS[1])
 
-        start_z = (self.position[2] * CHUNK_SIDE - 1) * self.scale
-        end_z   = ((self.position[2] + 1) * CHUNK_SIDE + 1) * self.scale
+        start_z = (self.position[2] * CHUNK_SIDE - 1) * self.width
+        end_z   = ((self.position[2] + 1) * CHUNK_SIDE + 1) * self.width
         world_z = np.linspace(start_z, end_z, CHUNK_DIMS[2])
 
         x_grid, z_grid = np.meshgrid(world_x, world_z, indexing='ij')
@@ -265,7 +277,8 @@ class Chunk:
         positions: list[np.ndarray] = []
         orientations: list[np.ndarray] = []
         tex_ids: list[np.ndarray] = []
-        scales: list[np.ndarray] = []
+        widths: list[np.ndarray] = []
+        heights: list[np.ndarray] = []
 
         for face, (dx, dy, dz) in FACES:
             neighbor = terrain[
@@ -279,16 +292,17 @@ class Chunk:
                 continue
 
             vx, vy, vz = np.nonzero(visible_mask)
-            wxv = (self.position[0] * CHUNK_SIDE + vx) * self.scale
-            wyv = (self.position[1] * CHUNK_SIDE + vy) * self.scale
-            wzv = (self.position[2] * CHUNK_SIDE + vz) * self.scale
+            wxv = (self.position[0] * CHUNK_SIDE + vx) * self.width
+            wyv = (self.position[1] * CHUNK_SIDE + vy) * self.height
+            wzv = (self.position[2] * CHUNK_SIDE + vz) * self.width
 
             positions.append(np.column_stack((wxv, wyv, wzv)))
             orientations.append(np.full(vx.shape[0], face, np.uint32))
 
             visible_blocks = terrain[1:-1, 1:-1, 1:-1][visible_mask]
             tex_ids.append(BLOCKS[visible_blocks, face])
-            scales.append(np.full(vx.shape[0], self.scale, np.uint32))
+            widths.append(np.full(vx.shape[0], self.width, np.float32))
+            heights.append(np.full(vx.shape[0], self.height, np.float32))
 
         if not positions:
             self.state = ChunkState.MESH_GENERATED
@@ -297,7 +311,8 @@ class Chunk:
         self.mesh_data.position = np.concatenate(positions)
         self.mesh_data.orientation = np.concatenate(orientations)
         self.mesh_data.tex_id = np.concatenate(tex_ids)
-        self.mesh_data.scale = np.concatenate(scales)
+        self.mesh_data.width = np.concatenate(widths)
+        self.mesh_data.height = np.concatenate(heights)
 
         self.state = ChunkState.MESH_GENERATED
         return
