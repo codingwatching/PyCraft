@@ -1,7 +1,7 @@
 from enum import IntEnum
 from os import cpu_count
 
-N_WORKERS: int = max([4, cpu_count()])
+N_WORKERS: int = max(4, cpu_count() or 4)
 
 RENDER_DIST = 4
 HIGHEST_LEVEL = 12

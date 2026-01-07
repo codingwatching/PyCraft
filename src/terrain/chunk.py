@@ -29,6 +29,36 @@ perlin.perturb.perturbType = fns.PerturbType.NoPerturb
 
 PositionType: TypeAlias = tuple[int, int, int]
 
+
+def greedy_mesh_2d(mask: np.ndarray) -> list[tuple[int, int, int, int]]:
+    """Return quads as (x, y, w, h) from a 2D boolean mask."""
+    h, w = mask.shape
+    used = np.zeros_like(mask, dtype=bool)
+    quads = []
+
+    for y in range(h):
+        for x in range(w):
+            if mask[y, x] and not used[y, x]:
+                # expand width
+                width = 1
+                while x + width < w and mask[y, x + width] and not used[y, x + width]:
+                    width += 1
+                # expand height
+                height = 1
+                done = False
+                while y + height < h and not done:
+                    for k in range(width):
+                        if not mask[y + height, x + k] or used[y + height, x + k]:
+                            done = True
+                            break
+                    if not done:
+                        height += 1
+                # mark used
+                used[y:y + height, x:x + width] = True
+                quads.append((x, y, width, height))
+    return quads
+
+
 class ChunkDict(TypedDict):
     id: str
     position: PositionType
@@ -250,13 +280,13 @@ class Chunk:
         heights = perlin \
             .genFromCoords(coords)[:n] \
             .reshape(CHUNK_SIDE + 2, CHUNK_SIDE + 2)
-        height_field = heights * 128
+        height_field = heights * 32
         Y = world_y.reshape(1, -1, 1)
         mask = Y < height_field[:, None, :]
 
         terrain = np.zeros_like(mask, dtype=np.uint8)
         terrain[mask] = np.random \
-            .randint(1, 3, size=np.count_nonzero(mask), dtype=np.uint8)
+            .randint(1, 2, size=np.count_nonzero(mask), dtype=np.uint8)
 
         self.terrain = terrain
         self.state = ChunkState.TERRAIN_GENERATED
