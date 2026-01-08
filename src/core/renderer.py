@@ -23,6 +23,7 @@ from OpenGL.GL import (
     glCullFace,
     glDepthFunc,
     glEnable,
+    glDisable,
     glFrontFace,
     glGenVertexArrays,
     glGetUniformLocation,
@@ -104,6 +105,7 @@ class Renderer:
 
         if self.state.wireframe:
             glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
+            glDisable(GL_CULL_FACE)
         else:
             glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
 

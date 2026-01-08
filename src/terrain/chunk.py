@@ -5,7 +5,6 @@ from multiprocessing import shared_memory as shm
 import numpy as np
 from typing import TypedDict
 from core.mesh import instance_dtype
-from time import perf_counter
 from .mesh_data import ChunkMeshData
 from .greedy_mesher import greedy_mesher
 from .generator import terrain_generator

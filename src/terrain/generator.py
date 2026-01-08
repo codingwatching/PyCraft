@@ -48,7 +48,7 @@ def terrain_generator(position: PositionType, level: int) -> np.ndarray:
 
     terrain = np.zeros_like(mask, dtype=np.uint8)
     terrain[mask] = np.random \
-        .randint(1, 3, size=np.count_nonzero(mask), dtype=np.uint8)
+        .randint(2, 3, size=np.count_nonzero(mask), dtype=np.uint8)
 
     return terrain
 
