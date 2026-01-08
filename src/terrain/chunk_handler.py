@@ -9,7 +9,7 @@ from time import sleep
 from .chunk import Chunk, ChunkMeshData
 from constants import ChunkState
 from core.utils import deallocate_shared_memory
-from constants import N_WORKERS
+from constants import N_WORKERS, RENDER_DIST
 from core.mesh import instance_dtype
 
 logger = logging.getLogger(__name__) 
@@ -28,7 +28,6 @@ class ChunkBuilder:
         entry = queue.pop(random.randint(0, len(queue) - 1))
         data = namespace.chunks[entry]
         
-        # Process chunk locally
         chunk = Chunk.from_dict(data)
         chunk.generate_terrain()
         chunk.generate_mesh()
@@ -192,25 +191,15 @@ class ChunkHandler:
         logger.debug(f"Starting build worker {pid}")
         builder = ChunkBuilder()
 
-        try:
-            while namespace.alive:
-                builder.step(namespace, pid)
-        finally:
-            # Clean up any remaining shared memory in this process
-            import gc
-            gc.collect()
+        while namespace.alive:
+            builder.step(namespace, pid)
 
     def mesh_worker(self, namespace) -> None:
         logger.debug(f"Starting mesh worker")
         mesher = MeshBuilder()
 
-        try:
-            while namespace.alive:
-                mesher.step(namespace)
-        finally:
-            # Clean up any remaining shared memory in this process
-            import gc
-            gc.collect()
+        while namespace.alive:
+            mesher.step(namespace)
 
     def world_worker(self, namespace) -> None:
         logger.debug("Starting world worker")
@@ -220,7 +209,7 @@ class ChunkHandler:
         for name in queuenames:
             queues[name] = []
         
-        a = 5
+        a = RENDER_DIST
         for x in range(-a, a):
             for y in range(-a, a):
                 for z in range(-a, a):
@@ -239,20 +228,13 @@ class ChunkHandler:
     def kill(self) -> None:
         logger.info("Terminating workers")
 
-        # Signal workers to stop
         self.namespace.alive = False
-        
-        # Give workers time to finish current work and clean up
         sleep(0.1)
         
-        # Wait for processes to exit naturally
         for process in self.processes:
             process.join()
             
-        # Clean up manager to prevent resource tracker warnings
         self.manager.shutdown()
-        
-        # Deallocate any remaining shared memory
         deallocate_shared_memory(self.namespace.mesh_shm)
         
         for chunk_id, chunk_data in self.namespace.chunks.items():
