@@ -1,6 +1,6 @@
 import numpy as np
 from type_hints import PositionType
-from constants import FACES, CHUNK_SIDE
+from constants import CHUNK_SIDE, FRONT, BACK, LEFT, RIGHT, TOP, BOTTOM, FACES
 from .mesh_data import ChunkMeshData
 
 # TODO why is this here
@@ -11,48 +11,59 @@ BLOCKS = np.array([
 ], dtype=np.uint8)
 
 def greedy_mesher(
-        terrain: np.ndarray, 
-        position: PositionType, 
+        terrain: np.ndarray,
+        position: PositionType,
         level: int
     ) -> ChunkMeshData | None:
-    scale_factor: int = 2 ** level
-    width, height = [float(scale_factor) for _ in range(2)]
+    scale_factor = 2 ** level
+    width, height = float(scale_factor), float(scale_factor)
+
+    # interior solid blocks
     solid = terrain[1:-1, 1:-1, 1:-1] > 0
 
-    positions: list[np.ndarray] = []
-    orientations: list[np.ndarray] = []
-    tex_ids: list[np.ndarray] = []
-    widths: list[np.ndarray] = []
-    heights: list[np.ndarray] = []
-
-    for face, (dx, dy, dz) in FACES:
+    masks: dict[int, np.ndarray] = {}
+    for face_idx, (dx, dy, dz) in FACES:
         neighbor = terrain[
             (1 + dx):(-1 + dx) or None,
             (1 + dy):(-1 + dy) or None,
             (1 + dz):(-1 + dz) or None
         ]
-        visible_mask = solid & (neighbor == 0)
+        masks[face_idx] = solid & (neighbor == 0)
 
-        if not np.any(visible_mask):
+    positions = []
+    orientations = []
+    tex_ids = []
+    widths = []
+    heights = []
+
+    for face_idx, mask in masks.items():
+        if not np.any(mask):
             continue
 
-        vx, vy, vz = np.nonzero(visible_mask)
-        wxv = (position[0] * CHUNK_SIDE + vx) * width
-        wyv = (position[1] * CHUNK_SIDE + vy) * height
-        wzv = (position[2] * CHUNK_SIDE + vz) * width
+        for z in range(mask.shape[2]):
+            slice_mask = mask[:, :, z]
+            if not np.any(slice_mask):
+                continue
 
-        positions.append(np.column_stack((wxv, wyv, wzv)))
-        orientations.append(np.full(vx.shape[0], face, np.uint32))
+            vx, vy = np.nonzero(slice_mask)
+            vz = np.full(vx.shape[0], z)
 
-        visible_blocks = terrain[1:-1, 1:-1, 1:-1][visible_mask]
-        tex_ids.append(BLOCKS[visible_blocks, face])
-        widths.append(np.full(vx.shape[0], width, np.float32))
-        heights.append(np.full(vx.shape[0], height, np.float32))
+            wxv = (position[0] * CHUNK_SIDE + vx) * width
+            wyv = (position[1] * CHUNK_SIDE + vy) * height
+            wzv = (position[2] * CHUNK_SIDE + vz) * width
+
+            positions.append(np.column_stack((wxv, wyv, wzv)))
+            orientations.append(np.full(vx.shape[0], face_idx, np.uint32))
+
+            visible_blocks = terrain[1:-1, 1:-1, 1:-1][:, :, z][slice_mask]
+            tex_ids.append(BLOCKS[visible_blocks, face_idx])
+            widths.append(np.full(vx.shape[0], width, np.float32))
+            heights.append(np.full(vx.shape[0], height, np.float32))
 
     if not positions:
         return None
 
-    mesh_data: ChunkMeshData = ChunkMeshData()
+    mesh_data = ChunkMeshData()
     mesh_data.position = np.concatenate(positions)
     mesh_data.orientation = np.concatenate(orientations)
     mesh_data.tex_id = np.concatenate(tex_ids)
