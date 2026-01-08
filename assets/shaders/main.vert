@@ -18,28 +18,28 @@ uniform mat4 projection;
 vec3 cubeVertex(int idx) {
     vec3 verts[36] = vec3[](
         // FRONT (+Z)
-        vec3(-0.5,-0.5,0.5), vec3(0.5,-0.5,0.5), vec3(0.5, 0.5,0.5),
-        vec3(0.5, 0.5,0.5), vec3(-0.5, 0.5,0.5), vec3(-0.5,-0.5,0.5),
+        vec3(0,0,1), vec3(1,0,1), vec3(1,1,1),
+        vec3(1,1,1), vec3(0,1,1), vec3(0,0,1),
 
         // BACK (-Z)
-        vec3(0.5,-0.5,-0.5), vec3(-0.5,-0.5,-0.5), vec3(-0.5, 0.5,-0.5),
-        vec3(-0.5, 0.5,-0.5), vec3(0.5, 0.5,-0.5), vec3(0.5,-0.5,-0.5),
+        vec3(1,0,0), vec3(0,0,0), vec3(0,1,0),
+        vec3(0,1,0), vec3(1,1,0), vec3(1,0,0),
 
         // LEFT (-X)
-        vec3(-0.5,-0.5,-0.5), vec3(-0.5,-0.5, 0.5), vec3(-0.5, 0.5, 0.5),
-        vec3(-0.5, 0.5, 0.5), vec3(-0.5, 0.5,-0.5), vec3(-0.5,-0.5,-0.5),
+        vec3(0,0,0), vec3(0,0,1), vec3(0,1,1),
+        vec3(0,1,1), vec3(0,1,0), vec3(0,0,0),
 
         // RIGHT (+X)
-        vec3(0.5,-0.5, 0.5), vec3(0.5,-0.5,-0.5), vec3(0.5, 0.5,-0.5),
-        vec3(0.5, 0.5,-0.5), vec3(0.5, 0.5, 0.5), vec3(0.5,-0.5, 0.5),
+        vec3(1,0,1), vec3(1,0,0), vec3(1,1,0),
+        vec3(1,1,0), vec3(1,1,1), vec3(1,0,1),
 
         // TOP (+Y)
-        vec3(-0.5,0.5, 0.5), vec3(0.5,0.5, 0.5), vec3(0.5,0.5,-0.5),
-        vec3(0.5,0.5,-0.5), vec3(-0.5,0.5,-0.5), vec3(-0.5,0.5, 0.5),
+        vec3(0,1,1), vec3(1,1,1), vec3(1,1,0),
+        vec3(1,1,0), vec3(0,1,0), vec3(0,1,1),
 
         // BOTTOM (-Y)
-        vec3(-0.5,-0.5,-0.5), vec3(0.5,-0.5,-0.5), vec3(0.5,-0.5, 0.5),
-        vec3(0.5,-0.5, 0.5), vec3(-0.5,-0.5, 0.5), vec3(-0.5,-0.5,-0.5)
+        vec3(0,0,0), vec3(1,0,0), vec3(1,0,1),
+        vec3(1,0,1), vec3(0,0,1), vec3(0,0,0)
     );
     return verts[idx];
 }
@@ -79,9 +79,7 @@ void main() {
     int idx = face * 6 + vert_id;  // final vertex index
 
     vec3 scaled_vertex = cubeVertex(idx);
-    scaled_vertex.x *= width;
-    scaled_vertex.y *= height;
-    scaled_vertex.z *= width;
+    // IGNORE SCALING FOR NOW
     vec3 local_pos = scaled_vertex;  // apply width/height scale
     vec3 world_pos = position + local_pos;
 
