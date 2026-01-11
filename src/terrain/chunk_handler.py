@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 class ChunkBuilder:
     def __init__(self) -> None:
+        self.n = 0
         return
 
     def step(self, namespace, pid: int) -> None:
@@ -33,7 +34,8 @@ class ChunkBuilder:
         chunk.generate_mesh()
         mesh_data = chunk.mesh_data.pack()
 
-        logger.debug(f"Worker {pid} generated {chunk.id_string}")
+        logger.debug(f"Worker {pid} generated {chunk.id_string} n={self.n}")
+        self.n += 1
 
         if len(mesh_data) == 0:
             return

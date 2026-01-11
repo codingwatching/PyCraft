@@ -29,6 +29,6 @@ void main() {
     tex_color.rgb *= light;
 
     // Fog calculation
-    float fog_factor = exp(-v_fog_distance * 0.0001);
+    float fog_factor = exp(-v_fog_distance * 0.01);
     out_color = mix(vec4(fog_color, tex_color.a), tex_color, fog_factor);
 }

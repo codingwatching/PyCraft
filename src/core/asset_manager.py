@@ -96,7 +96,7 @@ class AssetManager:
 
         texture_dir = os.path.join(asset_dir, "textures/")
         for file in os.listdir(texture_dir):
-            logger.info(f"\t{file}")
+            logger.info(f"\t{file} -> {len(textures)}")
             fullpath: str = os.path.join(texture_dir, file)
             texture = Image.open(fullpath).convert("RGBA")
             w, h = texture.size
@@ -130,8 +130,8 @@ class AssetManager:
     def get_shader_program(self, name: str) -> Any | None:
         if name not in self.shaders:
             raise Exception(
-                f"Tried to use shader {name}, " +
-                "but it doesn't exist or isn't loaded yet"
+                f"Tried to use shader {name}," +
+                " but it doesn't exist or isn't loaded yet"
             )
         return self.shaders[name]
 
