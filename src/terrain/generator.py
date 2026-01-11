@@ -3,7 +3,8 @@ import pyfastnoisesimd as fns
 from type_hints import PositionType
 from constants import CHUNK_SIDE, CHUNK_DIMS
 
-seed = np.random.randint(2**31)
+# seed = np.random.randint(2**31)
+seed = 19587
 N_threads = 12
 perlin = fns.Noise(seed=seed, numWorkers=N_threads)
 perlin.frequency = 0.004

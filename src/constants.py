@@ -3,7 +3,7 @@ from os import cpu_count
 
 N_WORKERS: int = max(4, cpu_count() or 4)
 
-RENDER_DIST = 4
+RENDER_DIST = 2
 HIGHEST_LEVEL = 12
 CHUNK_SIDE = 16
 CHUNK_DIMS = tuple([

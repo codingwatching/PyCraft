@@ -79,10 +79,27 @@ void main() {
     int idx = face * 6 + vert_id;  // final vertex index
 
     vec3 scaled_vertex = cubeVertex(idx);
-    // IGNORE SCALING FOR NOW
-    vec3 local_pos = scaled_vertex;  // apply width/height scale
-    vec3 world_pos = position + local_pos;
+    vec3 v = cubeVertex(idx);
+    int f = face;
 
+    if (f == 0 || f == 1)
+    {
+        v.x *= height;
+        v.y *= width;
+    }
+    else if (f == 2 || f == 3)
+    {
+        v.z *= width;
+        v.y *= height;
+    }
+    else
+    {
+        v.x *= width;
+        v.z *= height;
+    }
+
+    vec3 local_pos = v;
+    vec3 world_pos = position + local_pos;
     gl_Position = projection * view * vec4(world_pos, 1.0);
 
     v_pos = local_pos;
